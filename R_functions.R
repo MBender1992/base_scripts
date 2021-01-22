@@ -1,6 +1,8 @@
-setwd("Z:/Aktuell/Eigene Dateien/Eigene Dateien_Marc/R/base_scripts")
-source("R_functions_PhD.R")
-source("R_functions_Melanoma.R")
+
+source_github("https://raw.githubusercontent.com/MBender1992/base_scripts/Marc/R_functions_PhD.R")
+source_github("https://raw.githubusercontent.com/MBender1992/base_scripts/Marc/R_functions_Melanoma.R")
+# source("R_functions_PhD.R")
+# source("R_functions_Melanoma.R")
 
 #4....................................................................................................................
 ### custom.Heatmap
