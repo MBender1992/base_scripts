@@ -1,6 +1,4 @@
 
-setwd("Z:/Aktuell/Eigene Dateien/Eigene Dateien_Marc/R/base_scripts")
-
 ##################################################
 # This script contains several useful functions  #
 # for the analysis of chronic irradiated SCC     #
