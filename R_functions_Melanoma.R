@@ -63,7 +63,11 @@ load_melanoma_data <- function(characterAsFactor = TRUE){
   dat_res   <- read_csv("Responder_misc.csv") %>% 
     mutate(ID = as.character(ID)) %>% select(-c(therapy_start, Abnahmedatum)) %>%
     mutate(TRIM_PDL1_Expression = str_replace_all(TRIM_PDL1_Expression,"\\++","+")) %>% 
-    mutate(TRIM_PDL1_Expression = ifelse(TRIM_PDL1_Expression == "o", NA,TRIM_PDL1_Expression))
+    mutate(TRIM_PDL1_Expression = ifelse(TRIM_PDL1_Expression == "o", NA,TRIM_PDL1_Expression)) %>% 
+    mutate(breslow_thickness_mm = str_replace_all(breslow_thickness_mm, " mm", ""), 
+           breslow_thickness_mm = parse_number(breslow_thickness_mm)) %>% 
+    mutate(subtype = str_replace_all(subtype, "cutanes Melanom", "cutaneous"),
+           subtype = str_replace_all(subtype, "Schleimhautmelanom", "mucosal"))
   dat_lab   <- read_csv("Patiententabelle.csv")
   
   # change ID column to uniform capital letters for later filtering
