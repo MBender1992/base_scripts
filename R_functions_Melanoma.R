@@ -47,81 +47,37 @@ transpose_dataframe <-  function(colnames, data){
 #  - characterAsFactor: logical defining if characters should be converted to factors   #
 #                       important for example for machine learning                      #
 
-load_melanoma_data <- function(characterAsFactor = TRUE){
+load_melanoma_data <- function(){
+  require(devtools)
   
-  dir <- getwd()
+  url_miR <- "https://raw.githubusercontent.com/MBender1992/MelanomaStudy/Marc/Data/miRNA_Expression_Fireplex_Melanoma_Study.csv" 
+  url_meta <- "https://raw.githubusercontent.com/MBender1992/MelanomaStudy/Marc/Data/Metadata_Melanoma_Study.csv" 
   
-  if(dir != "Z:/Aktuell/Eigene Dateien/Eigene Dateien_Marc/R/Projekte/Doktorarbeiten_Melanom_Liquid_Biopsies/Daten"){
-    setwd("Z:/Aktuell/Eigene Dateien/Eigene Dateien_Marc/R/Projekte/Doktorarbeiten_Melanom_Liquid_Biopsies/Daten")
-  } 
   
   # load csv files
-  dat_miR   <- read_csv("miRNA_Expression_Fireplex_2.csv") 
-  dat_add   <- read_csv("Add_Info_grouped_age_sex.csv") 
-  dat_res   <- read_csv("Responder_misc.csv") %>% 
-    mutate(ID = as.character(ID)) %>% select(-c(therapy_start, Abnahmedatum)) %>%
+  dat_miR   <- read_csv(url(url_miR)) 
+  dat_meta  <- read_csv(url(url_meta)) %>%
+    select(-c(therapy_start, Abnahmedatum)) %>%
     mutate(TRIM_PDL1_Expression = str_replace_all(TRIM_PDL1_Expression,"\\++","+")) %>% 
-    mutate(TRIM_PDL1_Expression = ifelse(TRIM_PDL1_Expression == "o", NA,TRIM_PDL1_Expression)) %>% 
-    mutate(breslow_thickness_mm = str_replace_all(breslow_thickness_mm, " mm", ""), 
-           breslow_thickness_mm = parse_number(breslow_thickness_mm)) %>% 
-    mutate(subtype = str_replace_all(subtype, "cutanes Melanom", "cutaneous"),
-           subtype = str_replace_all(subtype, "Schleimhautmelanom", "mucosal"))
-  dat_lab   <- read_csv("Patiententabelle.csv")
+    mutate(TRIM_PDL1_Expression = ifelse(TRIM_PDL1_Expression == "o", NA,TRIM_PDL1_Expression))
   
   # change ID column to uniform capital letters for later filtering
   names(dat_miR) <- c("miRNA", toupper(names(dat_miR)[-1]))
-  names(dat_add) <- c("Sample", toupper(names(dat_add)[-1]))
   
   # define IDs to be dropped for further analyses
   controls <- c("K104_1", "K104_2", "K104_3A", "K104_3B")
   duplicates <- c("22B","38B","39B","47B")
   
-  # wide miR data
+  # wide miR data (78 patients with miRNA data)
   dat_miR_trans <- transpose_dataframe(colnames = c("ID",dat_miR$miRNA), data = dat_miR) %>%
     filter(!ID %in% controls & !ID %in% duplicates) %>%   #drop duplicate patient data 
     mutate(ID = parse_number(ID)) #convert ID to numeric
   
-  
-  # wide metadata
-  dat_add_trans <- transpose_dataframe(colnames = c("ID",dat_add$Sample), data = dat_add) %>%
-    mutate(ID = toupper(ID)) %>%
-    filter(!ID %in% controls & !ID %in% duplicates)%>% #drop duplicate patient data
-    mutate(ID = parse_number(ID), #convert ID to numeric
-           age = parse_number(as.character(age))) %>% #convert age to numeric
-    select(-Treatment)
-  
-  
-  #filter out duplicate patients in responder dataset
-  dat_res_filter <- dat_res %>%  
-    filter(!ID %in% controls & !ID %in% duplicates)%>%
-    mutate(ID = parse_number(ID))
-  
-  setwd(dir)
-  
-  # convert feature columns to factor for ML purpose
-  if(characterAsFactor == TRUE)
-  {
-    inner_join(dat_miR_trans,dat_add_trans, by="ID") %>%
-      inner_join(., dat_res_filter, by="ID") %>%
-      left_join(., dat_lab, by =c("ID","age","sex","Responder")) %>%
-      select(-c(Immuntherapie))  %>%
-      mutate(sex = factor(sex),
-             Responder = factor(ifelse(Responder == "ja", "pos","neg")),
-             adjuvant_IFN = factor(adjuvant_IFN),
-             Stadium = factor(ifelse(Stadium == "IV", "IV","<IV")))%>% # dichotomize outcome of Stadium variable
-      # drop unused factor levels
-      droplevels()
-  }
-  
-  # keep character columns as character for data gathering
-  else{
-    inner_join(dat_miR_trans,dat_add_trans, by="ID") %>%
-      inner_join(., dat_res_filter, by="ID") %>%
-      left_join(., dat_lab, by =c("ID","age","sex","Responder")) %>%
-      select(-c(Immuntherapie))
-  }
-  
-  
+  # join both tables
+  right_join(dat_miR_trans,dat_meta, by="ID") %>% 
+    filter(!ID %in% c(1,2)) %>% # no data available for patient 1 and 2 but still part of the source table
+    mutate(miRExpAssess = ifelse(is.na(rowSums(.[,which(str_detect(names(.),"mir"))])), 0,1))  %>%# if no miRNA expression has been measure fill in 0
+    arrange(ID)
 }
 # ..................................................................................................................
 
