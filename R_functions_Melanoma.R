@@ -59,9 +59,13 @@ load_melanoma_data <- function(){
   dat_meta  <- read_csv(url(url_meta)) %>%
     select(-c(therapy_start, Abnahmedatum)) %>%
     mutate(TRIM_PDL1_Expression = str_replace_all(TRIM_PDL1_Expression,"\\++","+")) %>% 
-    mutate(TRIM_PDL1_Expression = ifelse(TRIM_PDL1_Expression == "o", NA,TRIM_PDL1_Expression))
-  
-  # change ID column to uniform capital letters for later filtering
+    mutate(TRIM_PDL1_Expression = ifelse(TRIM_PDL1_Expression == "o", NA,TRIM_PDL1_Expression)) %>%
+    mutate(Stadium = toupper(Stadium)) %>%
+    mutate(Stadium = str_extract(Stadium, "^[IV]{1,3}")) %>%
+    mutate(BRAF = str_replace_all(BRAF, "\\.", "")) %>% 
+    mutate(breslow_thickness_mm = parse_number(breslow_thickness_mm))
+ 
+    # change ID column to uniform capital letters for later filtering
   names(dat_miR) <- c("miRNA", toupper(names(dat_miR)[-1]))
   
   # define IDs to be dropped for further analyses
@@ -270,40 +274,6 @@ scale_color_Melanoma <- function(...){
 
 
 #.................................................................................................................................
-# this function customizes breaks and limits to have a uniform number of breaks in each plot #
-
-# Arguments:                                                                        #
-#  - y: inherited y object from ggplot function (does not need to be specified)     #
-#  - n.breaks: changes number of breaks displayed                                   #
-
-limit_fun <- function(y) {
-  ymin <- floor(min(y))
-  ymax <- ceiling(max(y))
-  c(ymin,ymax)
-}
-
-break_fun <- function(y,n.breaks=n_breaks) {
-  min_break <- 2*floor(min(y/2))
-  max_break <- 2*ceiling(max(y/2))
-  breaks <- seq(min_break,max_break, by= sum(max_break-min_break)/n.breaks)
-  if (sum(max_break - min_break) <= 3) {
-    unique(ceiling(breaks/0.5) *0.5)
-  } else if (sum(max_break - min_break) > 3 & sum(max_break - min_break) <= 6){
-    unique(round(seq(min_break,max_break, by= sum(max_break-min_break)/n.breaks),0))
-  } else if (sum(max_break - min_break) > 6 & sum(max_break - min_break) <= 14){
-    unique(2*round(seq(min_break,max_break, by= sum(max_break-min_break)/n.breaks)/2,0))
-  } else {
-    unique(4*round(seq(min_break,max_break, by= sum(max_break-min_break)/n.breaks)/4,0))
-  }
-}
-# ..................................................................................................................
-
-
-
-
-
-
-#.................................................................................................................................
 # this function calculates t.test or wilcoxon test statistics with fdr adjustment #
 # and adds x and y positions to plot custom p values in plots                     #
 
@@ -329,7 +299,7 @@ signif_Melanoma <- function(data,x,y, group.var=NULL, p.adj = "fdr",var.equal = 
     x, sep=" "
   )
   
-  data <- data %>% filter(!is.na(get(x)))
+  data <- data %>% filter(!is.na(get(x)) & !is.na(get(y)))
   
   pvals <- compare_means(
     as.formula(formula),
@@ -431,8 +401,6 @@ boxplot_Melanoma <- function(data,
     theme_Melanoma(axis.text.size = axis.text.size,Legend =Legend) +
     scale_color_Melanoma() +
     scale_fill_Melanoma()
-  
-  
   
   p.facet + if(significance.new == TRUE){stat_pvalue_manual(diff.expr , label = p.label,
                                                             tip.length = tip.length,size=p.size,
