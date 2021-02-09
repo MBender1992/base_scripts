@@ -528,7 +528,7 @@ rbiomirgs_mrnascan_ctrl <- function (objTitle = "miRNA", mir = NULL, sp = "hsa",
 # rep: number of repetitions of the loop, number of control sets
 # miRdata: vector containing miRNA names to sample from
 # sample_n: number of miRNAs to sample
-GS_controls <- function(data,rep,miRdata, sample_n){
+GS_controls <- function(data,rep,miRdata, sample_n,gs_file = "c2.cp.kegg.v7.2.entrez.gmt"){
   set.seed(12)
   ctrl_list <- replicate(rep, {
     tmp <- sample(miRdata, sample_n)
@@ -547,14 +547,14 @@ GS_controls <- function(data,rep,miRdata, sample_n){
     
     # calculate GS score using logistic regression
     rbiomirgs_logistic(
-      objTitle = "ctrl_predicted_mirna_mrna_iwls_KEGG",
+      objTitle = "ctrl_predicted_mirna_mrna_iwls",
       mirna_DE = dat_ctrl, 
       var_mirnaName = "miRNA",
       var_mirnaFC = "FC", 
       var_mirnaP = "pvalue", 
       mrnalist = ctrl_predicted_mrna_entrez_list, 
       mrna_Weight = NULL, 
-      gs_file = "c2.cp.kegg.v7.2.entrez.gmt", 
+      gs_file = gs_file, 
       optim_method = "IWLS", 
       p.adj = "fdr", 
       parallelComputing = FALSE, 
@@ -569,6 +569,27 @@ GS_controls <- function(data,rep,miRdata, sample_n){
     mean(tmp[tmp != 1])
     
     list(number_target_genes = mean(tmp[tmp != 1]), 
-         res_GS = ctrl_predicted_mirna_mrna_iwls_KEGG_GS)
+         res_GS = ctrl_predicted_mirna_mrna_iwls_GS)
   })
 }  
+
+
+
+
+# calculate bias (as percentage of randomly enriched pathways and mean of number of genes targeted by miRNAs)
+pathway_ctrl_summary <- function(ls,n=n){
+  counts <- sapply(c(1:n), function(x){
+    tmp <- as.data.frame(ls[,x]$res_GS) %>% filter(adj.p.val < 0.05)
+    tmp$GS
+  }) %>% unlist() %>% table() 
+  
+  prob <- counts/n
+  
+  target_genes <- sapply(c(1:n), function(x){
+    as.data.frame(ls[,x]$number_target_genes) 
+  }) %>% unlist() %>% mean()
+  
+  list(bias = prob[order(desc(prob))],
+       mean_targets = target_genes)
+  
+}
