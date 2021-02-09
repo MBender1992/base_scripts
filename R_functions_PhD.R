@@ -166,9 +166,409 @@ theme_PhD <- function(axis.text.size=10, Legend = TRUE,...){
 # ..................................................................................................................
 
 
+######################################################
+#                                                    #
+#                   4. Misc                          #
+#                                                    #
+######################################################
+
+
+# function from RBiomiRGS package, without storing results in csv files for less storage usage
+rbiomirgs_mrnascan_ctrl <- function (objTitle = "miRNA", mir = NULL, sp = "hsa", 
+                                     addhsaEntrez = FALSE, queryType = NULL, predictPercentage = 10, 
+                                     url = "http://multimir.org/cgi-bin/multimir_univ.pl", 
+                                     parallelComputing = FALSE, clusterType = "PSOCK") 
+{
+  if (is.null(mir)) 
+    stop("Please set the input miRNA(s). Either single targets or a vector of mutliple ones can be used.")
+  if (!is.null(dim(mir))) 
+    stop("The input argument mir needs to be a vector. ")
+  if (!sp %in% c("hsa", "mmu", "rno")) {
+    stop(cat("Only human, mouse or rat are supported for now. Please choose either \"hsa\" (default), \"mmu\", or \"rno\" for species."))
+  }
+  if (sp == "hsa" && addhsaEntrez) {
+    cat("Argument addhsaEntrez automatically set to FALSE when sp = \"hsa\".\n")
+    addhsaEntrez = FALSE
+  }
+  if (is.null(queryType)) {
+    stop(cat("Please set the queryType argument. Options are \"validated\" and \"predicted\"."))
+  }
+  else if (queryType != "validated" & queryType != "predicted") {
+    stop(cat("queryType only takes \"validated\" or \"predicted\". Check the spell."))
+  }
+  else if (queryType == "validated") {
+    db <- c("mirecords", "mirtarbase", "tarbase")
+  }
+  else if (queryType == "predicted") {
+    if (sp == "rno") {
+      db <- c("elmmo", "microcosm", "miranda", 
+              "mirdb")
+    }
+    else {
+      db <- c("diana_microt", "elmmo", "microcosm", 
+              "miranda", "mirdb", "pictar", 
+              "pita", "targetscan")
+    }
+  }
+  tmpfunc_q <- function(i, j, mode = NULL, percentage = NULL) {
+    target.table <- "target"
+    mirna.table <- "mirna"
+    tmpmirna <- i
+    tmpmirna <- paste(tmpmirna, collapse = "','")
+    tmpmirna <- paste("('", tmpmirna, "')", sep = "")
+    if (mode == "validated") {
+      q <- paste("SELECT m.mature_mirna_id,", "t.target_symbol, t.target_entrez, t.target_ensembl,", 
+                 "i.experiment, i.pubmed_id FROM", mirna.table, 
+                 "AS m INNER JOIN", j, "AS i INNER JOIN", 
+                 target.table, "AS t ON (m.mature_mirna_uid=i.mature_mirna_uid AND", 
+                 "i.target_uid=t.target_uid) WHERE", sep = " ")
+      q <- paste(q, "(m.mature_mirna_acc IN", tmpmirna, 
+                 "OR m.mature_mirna_id IN", tmpmirna, ")", 
+                 sep = " ")
+      q <- paste(q, " AND m.org = '", sp, "' AND t.org = '", 
+                 sp, "'", sep = "")
+    }
+    else {
+      tmpfunc_cutoff <- function(cutoff.file = "http://multimir.ucdenver.edu/multimir_cutoffs.rda") {
+        multimir_cutoffs <- NULL
+        url.file <- url(cutoff.file)
+        on.exit(close(url.file))
+        load(url.file)
+        return(multimir_cutoffs)
+      }
+      q <- paste("SELECT m.mature_mirna_acc, m.mature_mirna_id,", 
+                 "t.target_symbol, t.target_entrez, t.target_ensembl FROM", 
+                 mirna.table, "AS m INNER JOIN", j, "AS i INNER JOIN", 
+                 target.table, "AS t ON (m.mature_mirna_uid=i.mature_mirna_uid", 
+                 "AND i.target_uid=t.target_uid) WHERE", 
+                 sep = " ")
+      if (j == "diana_microt") {
+        q <- sub(" FROM ", ", i.miTG_score AS score FROM ", 
+                 q)
+      }
+      else if (j == "elmmo") {
+        q <- sub(" FROM ", ", i.p AS score FROM ", 
+                 q)
+      }
+      else if (j %in% c("microcosm", "mirdb", 
+                        "pictar")) {
+        q <- sub(" FROM ", ", i.score FROM ", 
+                 q)
+      }
+      else if (j == "miranda") {
+        q <- sub(" FROM ", ", i.mirsvr_score AS score FROM ", 
+                 q)
+      }
+      else if (j == "pita") {
+        q <- sub(" FROM ", ", i.ddG AS score FROM ", 
+                 q)
+      }
+      else if (j == "targetscan") {
+        q <- sub(" FROM ", ", i.context_plus_score AS score FROM ", 
+                 q)
+      }
+      q <- paste(q, "(m.mature_mirna_acc IN", tmpmirna, 
+                 "OR m.mature_mirna_id IN", tmpmirna, ")", 
+                 sep = " ")
+      q <- paste(q, " AND m.org = '", sp, "' AND t.org = '", 
+                 sp, "'", sep = "")
+      nm <- paste(j, sp, sep = ".")
+      tmp_cutoff <- tmpfunc_cutoff()
+      cutoff <- tmp_cutoff[[nm]][[paste(percentage, "%", 
+                                        sep = "")]]
+      if (j == "diana_microt") {
+        q <- paste(q, "AND i.miTG_score >=", cutoff, 
+                   "ORDER BY i.miTG_score DESC", sep = " ")
+      }
+      else if (j == "elmmo") {
+        q <- paste(q, "AND i.p >=", cutoff, "ORDER BY i.p DESC", 
+                   sep = " ")
+      }
+      else if (j %in% c("microcosm", "mirdb", 
+                        "pictar")) {
+        q <- paste(q, "AND i.score >=", cutoff, 
+                   "ORDER BY i.score DESC", sep = " ")
+      }
+      else if (j == "miranda") {
+        q <- paste(q, "AND i.mirsvr_score <=", 
+                   cutoff, "ORDER BY i.mirsvr_score", sep = " ")
+      }
+      else if (j == "pita") {
+        q <- paste(q, "AND i.ddG <=", cutoff, "ORDER BY i.ddG", 
+                   sep = " ")
+      }
+      else if (j == "targetscan") {
+        q <- paste(q, "AND i.context_plus_score <=", 
+                   cutoff, "ORDER BY i.context_plus_score", 
+                   sep = " ")
+      }
+    }
+    tmprslt <- postForm(url, query = q, .cgifields = c("query"))
+    tmprslt <- readHTMLTable(tmprslt)
+    tmpout <- NULL
+    l <- length(tmprslt)
+    if (l == 2) {
+      tmpout <- tmprslt[[2]]
+    }
+    else if (l == 1) {
+      warning(paste("No records returned for miRNA: ", 
+                    i, " in database: ", j, ".", sep = ""))
+    }
+    else if (l == 0) {
+      cat(paste("Request to multiMiR web server failed. check the ", 
+                "your query, or", "use the multiMiR web server:", 
+                "http://multimir.ucdenver.edu is temporarily down.\n"))
+    }
+    if (!is.null(tmpout)) {
+      tmpout <- data.frame(database = j, tmpout, stringsAsFactors = FALSE)
+    }
+    return(tmpout)
+  }
+  tmpfunc_lst <- function(x) {
+    if (!is.null(x)) {
+      y <- as.character(unique(x$target_entrez))
+      y[y == ""] <- NA
+      y <- y[!is.na(y)]
+      y <- unique(y)
+    }
+    else {
+      y <- NA
+    }
+    return(y)
+  }
+  out <- vector(mode = "list", length = length(mir))
+  names(out) <- mir
+  out_entrez <- vector(mode = "list", length = length(mir))
+  names(out_entrez) <- mir
+  if (addhsaEntrez) {
+    cat(paste("Obtaining hsa orthologs information from ensembl databases for ", 
+              sp, "... May be slow depending on internet connectivity...", 
+              sep = ""))
+    if (sp == "mmu") {
+      martsp <- "mmusculus"
+    }
+    else if (sp == "rno") {
+      martsp <- "rnorvegicus"
+    }
+    martsp_ensembl <- useMart("ensembl", dataset = paste0(martsp, 
+                                                          "_gene_ensembl"))
+    attr <- c("ensembl_gene_id", "hsapiens_homolog_ensembl_gene")
+    martsp_hsa_orth <- getBM(attr, filters = "with_hsapiens_homolog", 
+                             values = TRUE, mart = martsp_ensembl)
+    names(martsp_hsa_orth)[names(martsp_hsa_orth) == "ensembl_gene_id"] <- paste0(sp, 
+                                                                                  "_ensembl_gene_id")
+    hsa_ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+    attr_hsa <- c("ensembl_gene_id", "entrezgene_id")
+    hsa_entrez <- getBM(attr_hsa, filters = "", values = TRUE, 
+                        mart = hsa_ensembl)
+    martsp_hsa_orth_entrez <- merge(martsp_hsa_orth, hsa_entrez, 
+                                    by.x = "hsapiens_homolog_ensembl_gene", by.y = "ensembl_gene_id", 
+                                    all.x = TRUE)
+    names(martsp_hsa_orth_entrez)[names(martsp_hsa_orth_entrez) == 
+                                    "entrezgene_id"] <- "hsa_entrezgene"
+    martsp_hsa_orth_entrez <- martsp_hsa_orth_entrez[!duplicated(martsp_hsa_orth_entrez[, 
+                                                                                        paste0(sp, "_ensembl_gene_id")]), ]
+    tmpfunc_hsa_entrez <- function(d) {
+      if (!is.null(d)) {
+        h <- as.character(martsp_hsa_orth_entrez[martsp_hsa_orth_entrez[, 
+                                                                        paste0(sp, "_ensembl_gene_id")] %in% 
+                                                   d$target_ensembl, "hsa_entrezgene"])
+        h[h == ""] <- NA
+        h <- h[!is.na(h)]
+        h <- unique(h)
+      }
+      else {
+        h <- NA
+      }
+      return(h)
+    }
+    cat("done!\n")
+    out_hsa_entrez <- vector(mode = "list", length = length(out_entrez))
+    names(out_hsa_entrez) <- names(out_entrez)
+  }
+  if (!parallelComputing) {
+    out[] <- lapply(mir, function(m) {
+      tmpout <- foreach(n = db, .combine = rbind, .packages = c("RCurl", 
+                                                                "XML")) %do% {
+                                                                  cat(paste("searching ", n, " for ", 
+                                                                            m, " ...", sep = ""))
+                                                                  tmp <- tmpfunc_q(i = m, j = n, mode = queryType, 
+                                                                                   percentage = predictPercentage)
+                                                                  cat("done!\n")
+                                                                  return(tmp)
+                                                                }
+    })
+    out_entrez[] <- foreach(o = 1:length(out)) %do% tmpfunc_lst(out[[o]])
+    if (addhsaEntrez) {
+      out_hsa_entrez[] <- foreach(p = 1:length(out)) %do% 
+        tmpfunc_hsa_entrez(out[[p]])
+    }
+  }
+  else {
+    n_cores <- detectCores() - 1
+    if (clusterType == "PSOCK") {
+      cl <- makeCluster(n_cores, type = clusterType, outfile = "")
+      registerDoParallel(cl)
+      on.exit(stopCluster(cl))
+      out[] <- foreach(m = mir, .packages = "foreach") %dopar% 
+        {
+          tmpout <- foreach(n = db, .combine = rbind, 
+                            .packages = c("RCurl", "XML")) %do% 
+            {
+              cat(paste("searching ", n, " for ", 
+                        m, " ...", sep = ""))
+              tmp <- tmpfunc_q(i = m, j = n, mode = queryType, 
+                               percentage = predictPercentage)
+              cat("done!\n")
+              return(tmp)
+            }
+        }
+      out_entrez[] <- foreach(o = 1:length(out)) %dopar% 
+        tmpfunc_lst(out[[o]])
+      if (addhsaEntrez) {
+        out_hsa_entrez[] <- foreach(p = 1:length(out)) %dopar% 
+          tmpfunc_hsa_entrez(out[[p]])
+      }
+    }
+    else if (clusterType == "FORK") {
+      cat(paste("searching ", db, " ...", sep = ""))
+      out[] <- mclapply(mir, FUN = function(m) {
+        tmp <- foreach(n = db, .combine = rbind, .packages = c("RCurl", 
+                                                               "XML")) %do% tmpfunc_q(m, n, mode = queryType, 
+                                                                                      percentage = predictPercentage)
+        return(tmp)
+      }, mc.cores = n_cores, mc.preschedule = FALSE)
+      cat("done!\n")
+      out_entrez[] <- mclapply(mir, FUN = function(m) {
+        tmp <- foreach(o = 1:length(out)) %do% tmpfunc_lst(out[[o]])
+        return(tmp)
+      }, mc.cores = n_cores, mc.preschedule = FALSE)
+      if (addhsaEntrez) {
+        out_hsa_entrez[] <- mclapply(mir, FUN = function(m) {
+          tmp <- foreach(p = 1:length(out)) %do% tmpfunc_hsa_entrez(out[[p]])
+          return(tmp)
+        }, mc.cores = n_cores, mc.preschedule = FALSE)
+      }
+    }
+  }
+  if (addhsaEntrez) {
+    message(paste("...all done! And entrez ID for hsa orthologs added for ", 
+                  sp, ".", sep = ""))
+  }
+  else {
+    message("...all done!")
+  }
+  assign(paste(objTitle, "_mrna_list", sep = ""), 
+         out, envir = .GlobalEnv)
+  assign(paste(objTitle, "_mrna_entrez_list", sep = ""), 
+         out_entrez, envir = .GlobalEnv)
+  if (addhsaEntrez) {
+    assign(paste(objTitle, "_mrna_hsa_entrez_list", 
+                 sep = ""), out_hsa_entrez, envir = .GlobalEnv)
+  }
+}
 
 
 
 
 
+# # Function to calculate n random controls for pathway analysis  
+# GS_controls <- function(n){
+#   set.seed(12)
+#   ctrl_list <- replicate(n, {
+#     tmp <- sample(dat_miRBase$miRNA, 10)
+#     ind <- sample(1:30, 10)
+#     ctrl_stats <- rbind(cl_1A, cl_2B, cl_4C) %>% 
+#       select(-miRNA) %>% 
+#       .[ind,] 
+#     dat_ctrl <-  cbind(tmp, ctrl_stats) %>%
+#       setNames(c("miRNA", "FC","pvalue")) 
+#     
+#     # select target mRNAs
+#     rbiomirgs_mrnascan_ctrl(
+#       objTitle = "ctrl_predicted",
+#       mir = dat_ctrl$miRNA, sp = "hsa",
+#       queryType = "predicted", 
+#       parallelComputing = TRUE, 
+#       clusterType = "PSOCK"
+#     )
+#     
+#     # calculate GS score using logistic regression
+#     rbiomirgs_logistic(
+#       objTitle = "ctrl_predicted_mirna_mrna_iwls_KEGG",
+#       mirna_DE = dat_ctrl, 
+#       var_mirnaName = "miRNA",
+#       var_mirnaFC = "FC", 
+#       var_mirnaP = "pvalue", 
+#       mrnalist = ctrl_predicted_mrna_entrez_list, 
+#       mrna_Weight = NULL, 
+#       gs_file = "c2.cp.kegg.v7.2.entrez.gmt", 
+#       optim_method = "IWLS", 
+#       p.adj = "fdr", 
+#       parallelComputing = FALSE, 
+#       clusterType = "PSOCK"
+#     )
+#     
+#     # add the mean number of genes targeted by the 10 miRNA set
+#     tmp <- lapply(c(1:length(ctrl_predicted_mrna_entrez_list)),function(x){
+#       ctrl_predicted_mrna_entrez_list[[x]] %>% length()
+#     }) %>% unlist() 
+#     # calculate mean of the genes and make sure lists from miRNAs without target genes are excluded 
+#     mean(tmp[tmp != 1])
+#     
+#     list(number_target_genes = mean(tmp[tmp != 1]), 
+#          res_GS = ctrl_predicted_mirna_mrna_iwls_KEGG_GS)
+#   })
+# }  
 
+
+
+# Function to calculate GS enrichment for control data 
+# data: data.frame containing FC and pvalue of the original data (is used to randmly sample values for the controls)
+# rep: number of repetitions of the loop, number of control sets
+# miRdata: vector containing miRNA names to sample from
+# sample_n: number of miRNAs to sample
+GS_controls <- function(data,rep,miRdata, sample_n){
+  set.seed(12)
+  ctrl_list <- replicate(rep, {
+    tmp <- sample(miRdata, sample_n)
+    ind <- sample(1:nrow(data), sample_n)
+    dat_ctrl <-  cbind(tmp, data[ind,]) %>%
+      setNames(c("miRNA", "FC","pvalue")) 
+    
+    # select target mRNAs
+    rbiomirgs_mrnascan_ctrl(
+      objTitle = "ctrl_predicted",
+      mir = dat_ctrl$miRNA, sp = "hsa",
+      queryType = "predicted", 
+      parallelComputing = TRUE, 
+      clusterType = "PSOCK"
+    )
+    
+    # calculate GS score using logistic regression
+    rbiomirgs_logistic(
+      objTitle = "ctrl_predicted_mirna_mrna_iwls_KEGG",
+      mirna_DE = dat_ctrl, 
+      var_mirnaName = "miRNA",
+      var_mirnaFC = "FC", 
+      var_mirnaP = "pvalue", 
+      mrnalist = ctrl_predicted_mrna_entrez_list, 
+      mrna_Weight = NULL, 
+      gs_file = "c2.cp.kegg.v7.2.entrez.gmt", 
+      optim_method = "IWLS", 
+      p.adj = "fdr", 
+      parallelComputing = FALSE, 
+      clusterType = "PSOCK"
+    )
+    
+    # add the mean number of genes targeted by the 10 miRNA set
+    tmp <- lapply(c(1:length(ctrl_predicted_mrna_entrez_list)),function(x){
+      ctrl_predicted_mrna_entrez_list[[x]] %>% length()
+    }) %>% unlist() 
+    # calculate mean of the genes and make sure lists from miRNAs without target genes are excluded 
+    mean(tmp[tmp != 1])
+    
+    list(number_target_genes = mean(tmp[tmp != 1]), 
+         res_GS = ctrl_predicted_mirna_mrna_iwls_KEGG_GS)
+  })
+}  
