@@ -174,7 +174,7 @@ theme_PhD <- function(axis.text.size=10, Legend = TRUE,...){
 
 
 # function from RBiomiRGS package, without storing results in csv files for less storage usage
-rbiomirgs_mrnascan_ctrl <- function (objTitle = "miRNA", mir = NULL, sp = "hsa", 
+rbiomirgs_mrnascan_custom <- function (objTitle = "miRNA", mir = NULL, sp = "hsa", 
                                      addhsaEntrez = FALSE, queryType = NULL, predictPercentage = 10, 
                                      url = "http://multimir.org/cgi-bin/multimir_univ.pl", 
                                      parallelComputing = FALSE, clusterType = "PSOCK") 
@@ -472,57 +472,6 @@ rbiomirgs_mrnascan_ctrl <- function (objTitle = "miRNA", mir = NULL, sp = "hsa",
 
 
 
-# # Function to calculate n random controls for pathway analysis  
-# GS_controls <- function(n){
-#   set.seed(12)
-#   ctrl_list <- replicate(n, {
-#     tmp <- sample(dat_miRBase$miRNA, 10)
-#     ind <- sample(1:30, 10)
-#     ctrl_stats <- rbind(cl_1A, cl_2B, cl_4C) %>% 
-#       select(-miRNA) %>% 
-#       .[ind,] 
-#     dat_ctrl <-  cbind(tmp, ctrl_stats) %>%
-#       setNames(c("miRNA", "FC","pvalue")) 
-#     
-#     # select target mRNAs
-#     rbiomirgs_mrnascan_ctrl(
-#       objTitle = "ctrl_predicted",
-#       mir = dat_ctrl$miRNA, sp = "hsa",
-#       queryType = "predicted", 
-#       parallelComputing = TRUE, 
-#       clusterType = "PSOCK"
-#     )
-#     
-#     # calculate GS score using logistic regression
-#     rbiomirgs_logistic(
-#       objTitle = "ctrl_predicted_mirna_mrna_iwls_KEGG",
-#       mirna_DE = dat_ctrl, 
-#       var_mirnaName = "miRNA",
-#       var_mirnaFC = "FC", 
-#       var_mirnaP = "pvalue", 
-#       mrnalist = ctrl_predicted_mrna_entrez_list, 
-#       mrna_Weight = NULL, 
-#       gs_file = "c2.cp.kegg.v7.2.entrez.gmt", 
-#       optim_method = "IWLS", 
-#       p.adj = "fdr", 
-#       parallelComputing = FALSE, 
-#       clusterType = "PSOCK"
-#     )
-#     
-#     # add the mean number of genes targeted by the 10 miRNA set
-#     tmp <- lapply(c(1:length(ctrl_predicted_mrna_entrez_list)),function(x){
-#       ctrl_predicted_mrna_entrez_list[[x]] %>% length()
-#     }) %>% unlist() 
-#     # calculate mean of the genes and make sure lists from miRNAs without target genes are excluded 
-#     mean(tmp[tmp != 1])
-#     
-#     list(number_target_genes = mean(tmp[tmp != 1]), 
-#          res_GS = ctrl_predicted_mirna_mrna_iwls_KEGG_GS)
-#   })
-# }  
-
-
-
 # Function to calculate GS enrichment for control data 
 # data: data.frame containing FC and pvalue of the original data (is used to randmly sample values for the controls)
 # rep: number of repetitions of the loop, number of control sets
@@ -537,7 +486,7 @@ GS_controls <- function(data,rep,miRdata, sample_n,gs_file = "c2.cp.kegg.v7.2.en
       setNames(c("miRNA", "FC","pvalue")) 
     
     # select target mRNAs
-    rbiomirgs_mrnascan_ctrl(
+    rbiomirgs_mrnascan_custom(
       objTitle = "ctrl_predicted",
       mir = dat_ctrl$miRNA, sp = "hsa",
       queryType = "predicted", 
