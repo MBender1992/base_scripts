@@ -64,7 +64,7 @@ load_melanoma_data <- function(){
     mutate(Stadium = str_extract(Stadium, "^[IV]{1,3}")) %>%
     mutate(BRAF = str_replace_all(BRAF, "\\.", "")) %>% 
     mutate(breslow_thickness_mm = parse_number(breslow_thickness_mm))
- 
+  
     # change ID column to uniform capital letters for later filtering
   names(dat_miR) <- c("miRNA", toupper(names(dat_miR)[-1]))
   
