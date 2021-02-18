@@ -930,3 +930,32 @@ exo_arrange <- function(data,x,y,facet.by,col="black", ylab){
   p3 <- ggexosome2(data,x,y[[3]], facet.by,col) + ylab(ylab[[3]])
   ggarrange(p1,p2,p3,nrow=1)
 }
+
+
+
+
+
+
+# function to display p-values in table1
+rndr <- function(x, name, ...) {
+  if (length(x) == 0) {
+    y <- dat_table1[[name]] 
+    ind <- !is.na(y)
+    y <- y[ind]
+    s <- rep("", length(render.default(x=y, name=name, ...)))
+    if (is.numeric(y)) {
+      p <- t.test(y ~ dat_table1$Responder[ind])$p.value
+    } else {
+      p <- chisq.test(table(y, droplevels(dat_table1$Responder[ind])))$p.value
+    }
+    s[2] <- sub("<", "&lt;", format.pval(p, digits=3, eps=0.001))
+    s
+  } else {
+    render.default(x=x, name=name, ...)
+  }
+}
+
+rndr.strat <- function(label, n, ...) {
+  ifelse(n==0, label, render.strat.default(label, n, ...))
+}
+
