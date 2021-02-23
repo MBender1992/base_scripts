@@ -959,3 +959,33 @@ rndr.strat <- function(label, n, ...) {
   ifelse(n==0, label, render.strat.default(label, n, ...))
 }
 
+
+calc.model.metrics.2 <- function(x.train, y.train,train.method = "glmnet", cv.method = "repeatedcv", number = 10, repeats = 5, metric = "ROC", tuneGrid){
+  # define ctrl function
+  cctrl1 <- trainControl(method=cv.method, number=number,repeats = repeats, returnResamp="all", 
+                         classProbs=TRUE, summaryFunction=twoClassSummary)
+  
+  # run glmnet model
+  set.seed(849)
+  md <- train(x.train, y.train, method = train.method,preProcess = c("center","scale"),
+              trControl = cctrl1,metric = metric,tuneGrid = tuneGrid)
+  # train coefs
+  feat <- coef(md$finalModel, md$finalModel$lambdaOpt)
+  
+  # obtain index from max metric
+  opt <- md$results[which(md$results$lambda == md$finalModel$lambdaOpt),]
+  
+  # predict
+  pred <- predict(md, x.test, type="raw")
+  
+  # object to return
+  res <- list(
+    coefficients = rownames_to_column(data.frame(vals = feat[feat[,1] != 0, 1][-1]),"coefs"),
+    train.metrics = opt[which(opt$ROC == max(opt$ROC)),],
+    test.metrics = data.frame(AUC = auc(roc(y.test, predict(md, x.test, type="prob")[,1])),
+                              Sens = sensitivity(y.test, pred)  ,
+                              Spec = specificity(y.test, pred))
+  )
+  
+  return(res)
+}
