@@ -1007,12 +1007,106 @@ model.matrix.subset <- function(model, data){
     mm <- model.matrix(Responder~., data = select(data, contains(c("Eosinophile","LDH","S100","CRP")),Responder))[,-1]
   } else if(model == "signif"){
     mm <- model.matrix(Responder~., data = select(data, contains(readRDS("significant_features.rds")),Responder))[,-1]
+  } else if(model == "relaxedLasso"){
+    mm <- model.matrix(Responder~., data = select(dat_log, c(feat.rel$coef,BRAF,Responder)))[,-1]
   } else {
     stop("Please specify 1 of the following 4 options: 
     1. 'baseline' for a base model using conventional serum markers (LDH, CRP, S100, Eosinophile)
     2. 'miRNA' for a model using only miRNAs (reduced by lasso to informative features) 
     3. 'signif' for a model with significantly different features between responders and non-responders
-    4. 'complete' for a model with all predictors (reduced by lasso)")
+    4. 'complete' for a model with all predictors (reduced by lasso)
+    5. 'relaxedLasso' for a model with the best predictors selected by the 'complete' model (afterwards reduced again with LASSO)")
   }
   return(mm)
 }
+
+
+
+
+
+
+
+
+lassoEval <- function(model, dat, rep, k){
+  # define model matrix with selected features
+  x <- model.matrix.subset(model, data = dat)
+  
+  # activate parallel computing
+  cl <- makeCluster(detectCores(), type='PSOCK')
+  registerDoParallel(cl)
+  
+  # generate 10 folds for outer loop
+  
+  set.seed(12)
+  fold.train <- createMultiFolds(y, k = k, times = rep) # ensure that at least 10 samples are in each fold
+  
+  # split data based on these folds (Fold1 means that Fold1 is used for testing)
+  train.test.folds <- lapply(c(1:rep), function(split){
+    
+    # select only folds containing the specified repeat in each iteration
+    if(split == 10){
+      ind <- names(fold.train) %>% str_detect("Rep10")
+      dat <- fold.train[ind]  
+    } else {
+      ind <- names(fold.train) %>% str_detect(paste("Rep0",split, sep =""))
+      dat <- fold.train[ind]
+    }
+    
+    # split data into training and test set with each fold being the test set once
+    res <- lapply(c(1:k), function(fold){
+      list(x.test = x[-dat[[fold]],], 
+           x.train = x[dat[[fold]],],
+           y.test = y[-dat[[fold]]],
+           y.train = y[dat[[fold]]] 
+      )
+    })
+    return(res)
+  })
+  
+  # define name of the list elements
+  reps <- paste0("Rep", 1:rep)
+  folds <- paste0("Fold", 1:k)
+  train.test.folds <- setNames(lapply(train.test.folds, setNames, folds), reps)
+  
+  set.seed(849)
+  lapply(c(1:rep), function(split){
+    # select Data from 1 repeat
+    dat <- train.test.folds[[paste("Rep",split, sep ="")]]
+    # print message to follow progress
+    message(paste("Starting calculation of Rep", split,"... of", rep))
+    # apply model to all folds of that 1 repeat and test against the remaining fold not used for training
+    res <- pblapply(c(1:k), function(fold){
+      calc.model.metrics.2(x.train = dat[[fold]]$x.train, y.train = dat[[fold]]$y.train, x.test =dat[[fold]]$x.test,
+                           y.test = dat[[fold]]$y.test, train.method = "glmnet",
+                           tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01,0.2,by = 0.01)))
+    })
+  })
+}
+
+
+
+
+trainDF <- function(data){
+  lapply(1:rep, function(split){
+    do.call(rbind.data.frame, sapply(data[[split]], '[', 'train.metrics')) %>% 
+      summarize(mean = mean(ROC), meanSens = mean(Sens, na.rm=T), meanSpec = mean(Spec)) 
+  }) 
+} 
+
+
+testDF <- function(data){
+  lapply(1:rep, function(split){
+    do.call(rbind.data.frame, sapply(data[[split]], '[', 'test.metrics')) %>% 
+      summarize(mean = mean(AUC), meanSens = mean(Sens, na.rm=T), meanSpec = mean(Spec)) 
+  }) 
+} 
+
+
+extractCoefs <- function(data){
+  lapply(1:10, function(x){
+    tmp <- sapply(sapply(data[[x]], '[', 'coefficients'), '[', 'coefs') %>% unlist()
+    data.frame(coef = tmp) 
+  })
+}
+  
+  
