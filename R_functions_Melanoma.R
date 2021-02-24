@@ -960,6 +960,11 @@ rndr.strat <- function(label, n, ...) {
 }
 
 
+
+
+
+
+
 calc.model.metrics.2 <- function(x.train, y.train, x.test, y.test, train.method = "glmnet", cv.method = "repeatedcv", number = 10, repeats = 5, metric = "ROC", tuneGrid){
   # define ctrl function
   cctrl1 <- trainControl(method=cv.method, number=number,repeats = repeats, returnResamp="all", 
@@ -993,11 +998,7 @@ calc.model.metrics.2 <- function(x.train, y.train, x.test, y.test, train.method 
 
 
 
-
-
-
-
-# 
+# function to select which columns to use for the model matrix as specified by the model argument
 model.matrix.subset <- function(model, data){
   if(model == "complete"){
     mm <- model.matrix(Responder~., data = data)[,-1]
@@ -1008,7 +1009,7 @@ model.matrix.subset <- function(model, data){
   } else if(model == "signif"){
     mm <- model.matrix(Responder~., data = select(data, contains(readRDS("significant_features.rds")),Responder))[,-1]
   } else if(model == "relaxedLasso"){
-    mm <- model.matrix(Responder~., data = select(dat_log, c(feat.rel$coef,BRAF,Responder)))[,-1]
+    mm <- model.matrix(Responder~., data = select(dat_log, c(feat.relaxed$coef,BRAF,Responder)))[,-1]
   } else {
     stop("Please specify 1 of the following 4 options: 
     1. 'baseline' for a base model using conventional serum markers (LDH, CRP, S100, Eosinophile)
@@ -1026,7 +1027,7 @@ model.matrix.subset <- function(model, data){
 
 
 
-
+# models a function based on a presepcified model and evaluates training and test test using ROC, Sensitivity and Specificity
 lassoEval <- function(model, dat, rep, k){
   # define model matrix with selected features
   x <- model.matrix.subset(model, data = dat)
@@ -1064,8 +1065,8 @@ lassoEval <- function(model, dat, rep, k){
   })
   
   # define name of the list elements
-  reps <- paste0("Rep", 1:rep)
-  folds <- paste0("Fold", 1:k)
+  reps <<- paste0("Rep", 1:rep)
+  folds <<- paste0("Fold", 1:k)
   train.test.folds <- setNames(lapply(train.test.folds, setNames, folds), reps)
   
   set.seed(849)
@@ -1085,7 +1086,7 @@ lassoEval <- function(model, dat, rep, k){
 
 
 
-
+# convert metrics from training data list to dataframe
 trainDF <- function(data){
   lapply(1:rep, function(split){
     do.call(rbind.data.frame, sapply(data[[split]], '[', 'train.metrics')) %>% 
@@ -1093,7 +1094,7 @@ trainDF <- function(data){
   }) 
 } 
 
-
+# convert metrics from trainingtest data list to dataframe
 testDF <- function(data){
   lapply(1:rep, function(split){
     do.call(rbind.data.frame, sapply(data[[split]], '[', 'test.metrics')) %>% 
@@ -1101,7 +1102,7 @@ testDF <- function(data){
   }) 
 } 
 
-
+# extract coefficients from model list 
 extractCoefs <- function(data){
   lapply(1:10, function(x){
     tmp <- sapply(sapply(data[[x]], '[', 'coefficients'), '[', 'coefs') %>% unlist()
