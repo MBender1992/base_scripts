@@ -551,17 +551,17 @@ signif_plot_Melanoma <- function(data, x, y, signif=1, method="t.test",p.adj = "
 
 # ......................................................................................................................
 # this function calculates cross validated AUC with 95% confidence intervals for a given caret model object #
-
-ci.cv_ROC <- function(data){
-  obs <-data$pred$obs
-  pred <- data$pred$pos
+ci.cv.ROC.lasso <- function(data){
+  require(cvAUC)
+  dat <- filter(data$pred, lambda == data$finalModel$lambdaOpt)
   
-  obs <-split(obs , f = data$pred$Resample)
-  pred <-split(pred , f = data$pred$Resample)
+  obs <-dat$obs
+  pred <- dat$nein
   
-  list(
-    cv_AUC = cvAUC(pred,obs),
-    ci.cvAUC = ci.cvAUC(pred,obs))
+  obs <-split(obs , f = dat$Resample)
+  pred <-split(pred , f = dat$Resample)
+  
+  ci.cvAUC(pred,obs)
 }
 # ......................................................................................................................
 
@@ -713,6 +713,10 @@ calc.model.metrics.2 <- function(x.train, y.train, x.test, y.test, train.method 
   # run glmnet model
   md <- train(x.train, y.train, method = train.method,preProcess = c("center","scale"),
               trControl = cctrl1,metric = metric,tuneGrid = tuneGrid)
+  
+  # obtain ci for cv
+  ci_cv <- ci.cv.ROC.lasso(md)
+  
   # train coefs
   feat <- coef(md$finalModel, md$finalModel$lambdaOpt)
   
@@ -726,6 +730,10 @@ calc.model.metrics.2 <- function(x.train, y.train, x.test, y.test, train.method 
   res <- list(
     coefficients = rownames_to_column(data.frame(vals = feat[feat[,1] != 0, 1][-1]),"coefs"),
     train.metrics = opt[which(opt$ROC == max(opt$ROC)),],
+    train.cv = , data.frame(cvAUC = ci_cv$cvAUC, 
+                            se = ci_cv$se,
+                            lower = ci_cv$ci[1],
+                            upper = ci_cv$ci[2]),
     test.metrics = data.frame(AUC = auc(roc(y.test, predict(md, x.test, type="prob")[,1])),
                               Sens = sensitivity(y.test, pred)  ,
                               Spec = specificity(y.test, pred))
@@ -733,6 +741,7 @@ calc.model.metrics.2 <- function(x.train, y.train, x.test, y.test, train.method 
   
   return(res)
 }
+
 
 
 
