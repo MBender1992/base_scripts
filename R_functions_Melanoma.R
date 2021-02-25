@@ -838,28 +838,13 @@ lassoEval <- function(model, dat, rep, k, tuneGrid = expand.grid(alpha = 1, lamb
 
 
 # convert metrics from training data list to dataframe
-trainDF <- function(data){
-  lapply(1:rep, function(split){
-    do.call(rbind.data.frame, sapply(data[[split]], '[', 'train.metrics'))# %>% 
-      #summarize(mean = mean(ROC), meanSens = mean(Sens, na.rm=T), meanSpec = mean(Spec)) 
+unlist.model <- function(dat,metric, element){
+  ls <- lapply(1:rep, function(split){
+    do.call(rbind.data.frame, sapply(dat[[split]], '[', element)) 
   }) 
-} 
+  unlist(sapply(ls, "[", metric))
+}
 
-cv.trainDF <- function(data){
-  lapply(1:rep, function(split){
-    do.call(rbind.data.frame, sapply(data[[split]], '[', 'train.cv')) %>% 
-      summarize(mean.cvAUC = mean(cvAUC), mean.se = mean(se),mean.lower = mean(lower), mean.upper = mean(upper)) 
-  }) 
-} 
-
-
-# convert metrics from trainingtest data list to dataframe
-testDF <- function(data){
-  lapply(1:rep, function(split){
-    do.call(rbind.data.frame, sapply(data[[split]], '[', 'test.metrics')) #%>% 
-      #summarize(mean = mean(AUC), meanSens = mean(Sens, na.rm=T), meanSpec = mean(Spec)) 
-  }) 
-} 
 
 # extract coefficients from model list 
 extractCoefs <- function(data){
@@ -868,5 +853,23 @@ extractCoefs <- function(data){
     data.frame(coef = tmp) 
   })
 }
-  
 
+
+# construct confidence interval of a vector x
+construct.ci <- function(x){
+  avg <- mean(x)
+  moe <- confInt(x)
+  data.frame(mean = avg,
+             lower = avg - moe,
+             upper = avg + moe)
+}
+
+
+# 
+rbind.model.ci <- function(model){
+  rbind(train.inner = data.frame(mean = mean(unlist.model(model, "cvAUC", "train.cv")),
+                                 lower = mean(unlist.model(model, "lower", "train.cv")),
+                                 upper = mean(unlist.model(model, "upper", "train.cv"))),
+        train.outer = construct.ci(unlist.model(model, "ROC", "train.metrics")),
+        test.outer =  construct.ci(unlist.model(model, "AUC", "test.metrics")))
+}
