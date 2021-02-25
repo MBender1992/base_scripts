@@ -552,16 +552,16 @@ signif_plot_Melanoma <- function(data, x, y, signif=1, method="t.test",p.adj = "
 # ......................................................................................................................
 # this function calculates cross validated AUC with 95% confidence intervals for a given caret model object #
 ci.cv.AUC.lasso <- function(data){
-  require(cvAUC)
+  
   dat <- filter(data$pred, lambda == data$finalModel$lambdaOpt)
   
   obs <-dat$obs
-  pred <- dat$nein
+  pred <- dat$nein # as nein is used as case sample, switch to ja if factor levels are reordered
   
   obs <-split(obs , f = dat$Resample)
   pred <-split(pred , f = dat$Resample)
   
-  ci.cvAUC(pred,obs)
+  cvAUC::ci.cvAUC(pred,obs)
 }
 # ......................................................................................................................
 
@@ -757,14 +757,17 @@ model.matrix.subset <- function(model, data){
   } else if(model == "signif"){
     mm <- model.matrix(Responder~., data = select(data, contains(readRDS("significant_features.rds")),Responder))[,-1]
   } else if(model == "relaxedLasso"){
-    mm <- model.matrix(Responder~., data = select(dat_log, c(feat.relaxed$coef,BRAF,Responder)))[,-1]
+    mm <- model.matrix(Responder~., data = select(data, c(feat.relaxed$coef,BRAF,Responder)))[,-1]
+  } else if(model == "relaxedLassomiRNA"){
+    mm <- model.matrix(Responder~., data = select(data, c(feat.relaxed.miRNA$coef,Responder)))[,-1]
   } else {
     stop("Please specify 1 of the following 4 options: 
     1. 'baseline' for a base model using conventional serum markers (LDH, CRP, S100, Eosinophile)
     2. 'miRNA' for a model using only miRNAs (reduced by lasso to informative features) 
     3. 'signif' for a model with significantly different features between responders and non-responders
     4. 'complete' for a model with all predictors (reduced by lasso)
-    5. 'relaxedLasso' for a model with the best predictors selected by the 'complete' model (afterwards reduced again with LASSO)")
+    5. 'relaxedLasso' for a model with the best predictors selected by the 'complete' model (afterwards reduced again with LASSO)
+    6. 'relaxedLassomiRNA for a model with the best predictors selected by the 'miRNA' model (afterwards reduced again with LASSO")
   }
   return(mm)
 }
@@ -776,7 +779,7 @@ model.matrix.subset <- function(model, data){
 
 
 # models a function based on a presepcified model and evaluates training and test test using ROC, Sensitivity and Specificity
-lassoEval <- function(model, dat, rep, k){
+lassoEval <- function(model, dat, rep, k, tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01,0.2,by = 0.01))){
   # define model matrix with selected features
   x <- model.matrix.subset(model, data = dat)
   
@@ -827,7 +830,7 @@ lassoEval <- function(model, dat, rep, k){
     res <- pblapply(c(1:k), function(fold){
       calc.model.metrics.2(x.train = dat[[fold]]$x.train, y.train = dat[[fold]]$y.train, x.test =dat[[fold]]$x.test,
                            y.test = dat[[fold]]$y.test, train.method = "glmnet",
-                           tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01,0.2,by = 0.01)))
+                           tuneGrid = tuneGrid)
     })
   })
 }
