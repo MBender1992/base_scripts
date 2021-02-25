@@ -551,7 +551,7 @@ signif_plot_Melanoma <- function(data, x, y, signif=1, method="t.test",p.adj = "
 
 # ......................................................................................................................
 # this function calculates cross validated AUC with 95% confidence intervals for a given caret model object #
-ci.cv.ROC.lasso <- function(data){
+ci.cv.AUC.lasso <- function(data){
   require(cvAUC)
   dat <- filter(data$pred, lambda == data$finalModel$lambdaOpt)
   
@@ -706,18 +706,19 @@ rndr.strat <- function(label, n, ...) {
 
 
 calc.model.metrics.2 <- function(x.train, y.train, x.test, y.test, train.method = "glmnet", cv.method = "repeatedcv", number = 10, repeats = 5, metric = "ROC", tuneGrid){
+  
   # define ctrl function
-  cctrl1 <- trainControl(method=cv.method, number=number,repeats = repeats, returnResamp="all",
+  cctrl1 <- trainControl(method=cv.method, number=number,repeats = repeats, returnResamp="all",savePredictions = T, 
                          classProbs=TRUE, summaryFunction=twoClassSummary)
   
   # run glmnet model
-  md <- train(x.train, y.train, method = train.method,preProcess = c("center","scale"),
+  md <- train(x.train, y.train, method = train.method,preProcess = c("center","scale"), 
               trControl = cctrl1,metric = metric,tuneGrid = tuneGrid)
   
-  # obtain ci for cv
-  ci_cv <- ci.cv.ROC.lasso(md)
+  # obtain cv AUC of training folds
+  ci_cv <- ci.cv.AUC.lasso(md)
   
-  # train coefs
+   # train coefs
   feat <- coef(md$finalModel, md$finalModel$lambdaOpt)
   
   # obtain index from max metric
@@ -730,7 +731,7 @@ calc.model.metrics.2 <- function(x.train, y.train, x.test, y.test, train.method 
   res <- list(
     coefficients = rownames_to_column(data.frame(vals = feat[feat[,1] != 0, 1][-1]),"coefs"),
     train.metrics = opt[which(opt$ROC == max(opt$ROC)),],
-    train.cv = , data.frame(cvAUC = ci_cv$cvAUC, 
+    train.cv = data.frame(cvAUC = ci_cv$cvAUC,
                             se = ci_cv$se,
                             lower = ci_cv$ci[1],
                             upper = ci_cv$ci[2]),
@@ -741,8 +742,6 @@ calc.model.metrics.2 <- function(x.train, y.train, x.test, y.test, train.method 
   
   return(res)
 }
-
-
 
 
 
@@ -838,16 +837,24 @@ lassoEval <- function(model, dat, rep, k){
 # convert metrics from training data list to dataframe
 trainDF <- function(data){
   lapply(1:rep, function(split){
-    do.call(rbind.data.frame, sapply(data[[split]], '[', 'train.metrics')) %>% 
-      summarize(mean = mean(ROC), meanSens = mean(Sens, na.rm=T), meanSpec = mean(Spec)) 
+    do.call(rbind.data.frame, sapply(data[[split]], '[', 'train.metrics'))# %>% 
+      #summarize(mean = mean(ROC), meanSens = mean(Sens, na.rm=T), meanSpec = mean(Spec)) 
   }) 
 } 
+
+cv.trainDF <- function(data){
+  lapply(1:rep, function(split){
+    do.call(rbind.data.frame, sapply(data[[split]], '[', 'train.cv')) %>% 
+      summarize(mean.cvAUC = mean(cvAUC), mean.se = mean(se),mean.lower = mean(lower), mean.upper = mean(upper)) 
+  }) 
+} 
+
 
 # convert metrics from trainingtest data list to dataframe
 testDF <- function(data){
   lapply(1:rep, function(split){
-    do.call(rbind.data.frame, sapply(data[[split]], '[', 'test.metrics')) %>% 
-      summarize(mean = mean(AUC), meanSens = mean(Sens, na.rm=T), meanSpec = mean(Spec)) 
+    do.call(rbind.data.frame, sapply(data[[split]], '[', 'test.metrics')) #%>% 
+      #summarize(mean = mean(AUC), meanSens = mean(Sens, na.rm=T), meanSpec = mean(Spec)) 
   }) 
 } 
 
