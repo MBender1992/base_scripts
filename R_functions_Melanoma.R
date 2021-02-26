@@ -870,6 +870,6 @@ rbind.model.ci <- function(model){
   rbind(train.inner = data.frame(mean = mean(unlist.model(model, "cvAUC", "train.cv")),
                                  lower = mean(unlist.model(model, "lower", "train.cv")),
                                  upper = mean(unlist.model(model, "upper", "train.cv"))),
-        train.outer = construct.ci(unlist.model(model, "ROC", "train.metrics")),
+        #train.outer = construct.ci(unlist.model(model, "ROC", "train.metrics")),
         test.outer =  construct.ci(unlist.model(model, "AUC", "test.metrics")))
 }
