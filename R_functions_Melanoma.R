@@ -766,24 +766,25 @@ calc.model.metrics.2 <- function(x.train, y.train, x.test, y.test, train.method 
   opt <- md$results[which(md$results$lambda == md$finalModel$lambdaOpt),]
   
   # predict
-  pred <- predict(md, x.test, type="raw")
+  pred <- predict(md, x.test, type="prob")
   
   # object to return
   res <- list(
-    predictions = data.frame(pred.ja = predict(md, x.test, type="prob")$ja, obs = y.test),
+    predictions = data.frame(pred.ja = pred$ja, obs = y.test),
     coefficients = rownames_to_column(data.frame(vals = feat[feat[,1] != 0, 1][-1]),"coefs"),
     train.metrics = opt[which(opt$ROC == max(opt$ROC)),],
     train.cv = data.frame(cvAUC = ci_cv$cvAUC,
                           se = ci_cv$se,
                           lower = ci_cv$ci[1],
                           upper = ci_cv$ci[2]),
-    test.metrics = data.frame(AUC = auc(roc(y.test, predict(md, x.test, type="prob")[,1])),
-                              Sens = sensitivity(y.test, pred)  ,
-                              Spec = specificity(y.test, pred))
+    test.metrics = data.frame(AUC = auc(roc(y.test, pred[,1], direction = ">", levels = c("nein", "ja"))),
+                              Sens = sensitivity(y.test, predict(md, x.test, type="raw"))  ,
+                              Spec = specificity(y.test, predict(md, x.test, type="raw")))
   )
-  
   return(res)
 }
+
+
 
 
 
