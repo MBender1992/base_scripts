@@ -796,9 +796,9 @@ model.matrix.subset <- function(model, data){
   } else if(model == "baseline"){
     mm <- model.matrix(Responder~., data = select(data, contains(c("Eosinophile","LDH","S100","CRP")),Responder))[,-1]
   } else if(model == "signif"){
-    mm <- model.matrix(Responder~., data = select(data, contains(readRDS("significant_features.rds")),Responder))[,-1]
+    mm <- model.matrix(Responder~., data = select(data, contains(readRDS("significant_features.rds")),Alter,prior_BRAF_therapy,Responder))[,-1]
   } else if(model == "relaxedLasso"){
-    mm <- model.matrix(Responder~., data = select(data, c(feat.relaxed$coef,BRAF,Responder)))[,-1]
+    mm <- model.matrix(Responder~., data = select(data, c(feat.relaxed$coef, Alter, prior_BRAF_therapy,Responder)))[,-1]
   } else if(model == "relaxedLassomiRNA"){
     mm <- model.matrix(Responder~., data = select(data, c(feat.relaxed.miRNA$coef,Responder)))[,-1]
   } else {
