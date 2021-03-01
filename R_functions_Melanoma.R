@@ -81,7 +81,9 @@ load_melanoma_data <- function(){
   right_join(dat_miR_trans,dat_meta, by="ID") %>% 
     filter(!ID %in% c(1,2)) %>% # no data available for patient 1 and 2 but still part of the source table
     mutate(miRExpAssess = ifelse(is.na(rowSums(.[,which(str_detect(names(.),"mir"))])), 0,1))  %>%# if no miRNA expression has been measure fill in 0
-    arrange(ID)
+    arrange(ID) %>% 
+    mutate(prior_BRAF_therapy = ifelse(str_detect(Vorbehandlung,"Mek|Dabra|Tafinlar|Tefinlar|MEK|BRAF|Vemu|[zZ]ellboraf"), 1, 0)) %>%
+    select(-Vorbehandlung)
 }
 # ..................................................................................................................
 
