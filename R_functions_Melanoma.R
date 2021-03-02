@@ -897,21 +897,45 @@ extractCoefs <- function(data){
 }
 
 
-# construct confidence interval of a vector x
-construct.ci <- function(x){
-  avg <- mean(x)
-  moe <- confInt(x)
-  data.frame(mean = avg,
-             lower = avg - moe,
-             upper = avg + moe)
-}
 
 
 # 
 rbind.model.ci <- function(model){
-  rbind(train.inner = data.frame(mean = mean(unlist.model(model, "cvAUC", "train.cv")),
+  
+  ls <- ls_cvAUC(model)
+  out <- cvAUC(ls$predictions, ls$labels)
+  res <-  ci.cvAUC(ls$predictions, ls$labels)
+  
+  rbind(train.inner = data.frame(cvAUC = mean(unlist.model(model, "cvAUC", "train.cv")),
                                  lower = mean(unlist.model(model, "lower", "train.cv")),
                                  upper = mean(unlist.model(model, "upper", "train.cv"))),
-        #train.outer = construct.ci(unlist.model(model, "ROC", "train.metrics")),
-        test.outer =  construct.ci(unlist.model(model, "AUC", "test.metrics")))
+        test.outer = data.frame(cvAUC = res$cvAUC,
+                                lower = min(res$ci),
+                                upper = max(res$ci)
+                                )
+  )
+}
+
+
+
+
+## function to split data in a way that the function cvAUC can use it for calculation of ROC, se and confidence intervals
+ls_cvAUC <- function(data){
+  predictions <- lapply(1:10, function(d){
+    tmp <- sapply(data[[d]], "[", "predictions")
+    lapply(1:10, function(x){
+      1-tmp[[x]]$pred.ja
+    })
+  })
+  
+  
+  labels <- lapply(1:10, function(d){
+    test <- sapply(data[[d]], "[", "predictions")
+    lapply(1:10, function(x){
+      tmp[[x]]$obs
+    })
+  }) 
+  
+  list(predictions = lapply(rapply(predictions, enquote, how="unlist"), eval),
+       labels = lapply(rapply(labels, enquote, how="unlist"), eval))
 }
