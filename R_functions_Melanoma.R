@@ -48,7 +48,7 @@ transpose_dataframe <-  function(colnames, data){
 #                       important for example for machine learning                      #
 
 load_melanoma_data <- function(){
-  require(readxl)
+  library(readxl)
   
   # load csv files
   dat_miR   <- read_csv("Data/miRNA_Expression_Fireplex_Melanoma_Study.csv")
