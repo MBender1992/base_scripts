@@ -48,15 +48,11 @@ transpose_dataframe <-  function(colnames, data){
 #                       important for example for machine learning                      #
 
 load_melanoma_data <- function(){
-  require(devtools)
-  
-  url_miR <- "https://raw.githubusercontent.com/MBender1992/MelanomaStudy/Marc/Data/miRNA_Expression_Fireplex_Melanoma_Study.csv" 
-  url_meta <- "https://raw.githubusercontent.com/MBender1992/MelanomaStudy/Marc/Data/Metadata_Melanoma_Study.csv" 
-  
+  require(readxl)
   
   # load csv files
-  dat_miR   <- read_csv(url(url_miR)) 
-  dat_meta  <- read_csv(url(url_meta)) %>%
+  dat_miR   <- read_csv("Data/miRNA_Expression_Fireplex_Melanoma_Study.csv")
+  dat_meta  <- read_xlsx("Data/Metadata_Melanoma_Study.xlsx") %>%
     select(-c(therapy_start, Abnahmedatum)) %>%
     mutate(TRIM_PDL1_Expression = str_replace_all(TRIM_PDL1_Expression,"\\++","+")) %>% 
     mutate(TRIM_PDL1_Expression = ifelse(TRIM_PDL1_Expression == "o", NA,TRIM_PDL1_Expression)) %>%
@@ -82,6 +78,7 @@ load_melanoma_data <- function(){
     filter(!ID %in% c(1,2)) %>% # no data available for patient 1 and 2 but still part of the source table
     mutate(miRExpAssess = ifelse(is.na(rowSums(.[,which(str_detect(names(.),"mir"))])), 0,1))  %>%# if no miRNA expression has been measure fill in 0
     arrange(ID) %>% 
+    mutate(Responder = factor(Responder, levels = c("nein", "ja"), labels = c("no", "yes"))) %>%
     mutate(prior_BRAF_therapy = ifelse(str_detect(Vorbehandlung,"Mek|Dabra|Tafinlar|Tefinlar|MEK|BRAF|Vemu|[zZ]ellboraf"), 1, 0)) %>%
     select(-Vorbehandlung)
 }
