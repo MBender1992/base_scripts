@@ -858,8 +858,8 @@ lassoEval <- function(model, dat, rep, k, tuneGrid = expand.grid(alpha = 1, lamb
   })
   
   # define name of the list elements
-  reps <<- paste0("Rep", 1:rep)
-  folds <<- paste0("Fold", 1:k)
+  reps <- paste0("Rep", 1:rep)
+  folds <- paste0("Fold", 1:k)
   train.test.folds <- setNames(lapply(train.test.folds, setNames, folds), reps)
   
   set.seed(849)
@@ -930,9 +930,9 @@ ls_cvAUC <- function(data){
   
   
   labels <- lapply(1:10, function(d){
-    test <- sapply(data[[d]], "[", "predictions")
+    labs <- sapply(data[[d]], "[", "predictions")
     lapply(1:10, function(x){
-      tmp[[x]]$obs
+      labs[[x]]$obs
     })
   }) 
   
