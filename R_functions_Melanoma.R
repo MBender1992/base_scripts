@@ -906,10 +906,10 @@ rbind.model.ci <- function(model){
   out <- cvAUC(ls$predictions, ls$labels)
   res <-  ci.cvAUC(ls$predictions, ls$labels)
   
-  rbind(train.inner = data.frame(cvAUC = mean(unlist.model(model, "cvAUC", "train.cv")),
+  rbind(cv.AUC.inner = data.frame(cvAUC = mean(unlist.model(model, "cvAUC", "train.cv")),
                                  lower = mean(unlist.model(model, "lower", "train.cv")),
                                  upper = mean(unlist.model(model, "upper", "train.cv"))),
-        test.outer = data.frame(cvAUC = res$cvAUC,
+        cv.AUC.outer = data.frame(cvAUC = res$cvAUC,
                                 lower = min(res$ci),
                                 upper = max(res$ci)
                                 )
