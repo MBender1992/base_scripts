@@ -555,7 +555,7 @@ ci.cv.AUC.lasso <- function(data){
   dat <- filter(data$pred, lambda == data$finalModel$lambdaOpt)
   
   obs <-dat$obs
-  pred <- dat$nein # as nein is used as case sample, switch to ja if factor levels are reordered
+  pred <- dat$yes # change to no if AUC values are switched
   
   obs <-split(obs , f = dat$Resample)
   pred <-split(pred , f = dat$Resample)
@@ -704,44 +704,6 @@ rndr.strat <- function(label, n, ...) {
 ## tuneGrid = grid with hyperparameters to be tuned
 
 
-# calc.model.metrics.2 <- function(x.train, y.train, x.test, y.test, train.method = "glmnet", cv.method = "repeatedcv", number = 10, repeats = 5, metric = "ROC", tuneGrid){
-#   
-#   # define ctrl function
-#   cctrl1 <- trainControl(method=cv.method, number=number,repeats = repeats, returnResamp="all",savePredictions = T, 
-#                          classProbs=TRUE, summaryFunction=twoClassSummary)
-#   
-#   # run glmnet model
-#   md <- train(x.train, y.train, method = train.method,preProcess = c("center","scale"), 
-#               trControl = cctrl1,metric = metric,tuneGrid = tuneGrid)
-#   
-#   # obtain cv AUC of training folds
-#   ci_cv <- ci.cv.AUC.lasso(md)
-#   
-#    # train coefs
-#   feat <- coef(md$finalModel, md$finalModel$lambdaOpt)
-#   
-#   # obtain index from max metric
-#   opt <- md$results[which(md$results$lambda == md$finalModel$lambdaOpt),]
-#   
-#   # predict
-#   pred <- predict(md, x.test, type="raw")
-#   
-#   # object to return
-#   res <- list(
-#     coefficients = rownames_to_column(data.frame(vals = feat[feat[,1] != 0, 1][-1]),"coefs"),
-#     train.metrics = opt[which(opt$ROC == max(opt$ROC)),],
-#     train.cv = data.frame(cvAUC = ci_cv$cvAUC,
-#                             se = ci_cv$se,
-#                             lower = ci_cv$ci[1],
-#                             upper = ci_cv$ci[2]),
-#     test.metrics = data.frame(AUC = auc(roc(y.test, predict(md, x.test, type="prob")[,1])),
-#                               Sens = sensitivity(y.test, pred)  ,
-#                               Spec = specificity(y.test, pred))
-#   )
-#   
-#   return(res)
-# }
-
 
 calc.model.metrics.2 <- function(x.train, y.train, x.test, y.test, train.method = "glmnet", cv.method = "repeatedcv", number = 10, repeats = 5, metric = "ROC", tuneGrid){
   
@@ -767,14 +729,14 @@ calc.model.metrics.2 <- function(x.train, y.train, x.test, y.test, train.method 
   
   # object to return
   res <- list(
-    predictions = data.frame(pred.ja = pred$ja, obs = y.test),
+    predictions = data.frame(pred.ja = pred$yes, obs = y.test),
     coefficients = rownames_to_column(data.frame(vals = feat[feat[,1] != 0, 1][-1]),"coefs"),
     train.metrics = opt[which(opt$ROC == max(opt$ROC)),],
     train.cv = data.frame(cvAUC = ci_cv$cvAUC,
                           se = ci_cv$se,
                           lower = ci_cv$ci[1],
                           upper = ci_cv$ci[2]),
-    test.metrics = data.frame(AUC = auc(roc(y.test, pred[,1], direction = ">", levels = c("nein", "ja"))),
+    test.metrics = data.frame(AUC = auc(roc(y.test, pred[,1], direction = ">", levels = c("no", "yes"))),
                               Sens = sensitivity(y.test, predict(md, x.test, type="raw"))  ,
                               Spec = specificity(y.test, predict(md, x.test, type="raw")))
   )
@@ -810,10 +772,6 @@ model.matrix.subset <- function(model, data){
   }
   return(mm)
 }
-
-
-
-
 
 
 
@@ -872,6 +830,7 @@ lassoEval <- function(model, dat, rep, k, tuneGrid = expand.grid(alpha = 1, lamb
                            tuneGrid = tuneGrid)
     })
   })
+  stopCluster(cl)
 }
 
 
