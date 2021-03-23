@@ -96,31 +96,30 @@ extract_clusters <- function(data, HeatmapObj, sampleName, sampleClust, geneName
 # this function is used to calculate fold changes and pvalues in clusters extracted out of Heatmap #
 
 # Function to extract fold changes and p-values of clusters
-summary_clusters <- function(ls, miRcluster, cellcluster){
+
+summary_clusters <- function(ls, miRcluster, samplecluster){
   # filter data for miRNA cluster i and combine data from cell cluster B and C as we wanna compare cluster A to the rest as the Heatmap indicates upregulation
   data <- ls[[miRcluster]] %>%
-    mutate(cellCluster = ifelse(cellCluster == cellcluster, cellcluster, "ref")) %>%
+    mutate(sampleCluster = ifelse(sampleCluster == samplecluster, samplecluster, "ref")) %>%
     select(-miRCluster)
   # calculate FoldChange of the specified cluster vs the rest
   FC <- data %>%
-    group_by(miRNA, cellCluster) %>%
+    group_by(miRNA, sampleCluster) %>%
     summarize(mean = mean(log_exp)) %>%
     ungroup() %>%
     group_by(miRNA) %>%
-    summarize(logFC = mean[cellCluster==cellcluster]-mean[cellCluster =="ref"])
-  # calculate pvalues 
-  p_val <- data %>% 
+    summarize(logFC = mean[sampleCluster==samplecluster]-mean[sampleCluster =="ref"])
+  # calculate pvalues
+  p_val <- data %>%
     group_by(miRNA) %>%
-    t_test(log_exp~cellCluster) %>%
+    t_test(log_exp~sampleCluster) %>%
     adjust_pvalue(method = "fdr")
-  joined <- left_join(p_val, FC) %>% 
+  joined <- left_join(p_val, FC) %>%
     mutate(FC = 2^logFC) %>%
     select(c(miRNA,FC, p.adj)) %>%
     setNames(c("miRNA", "FC","pvalue"))
   return(joined)
 }
-
-
 
 # ..................................................................................................................
 # this function is used to drop attributes of a list #

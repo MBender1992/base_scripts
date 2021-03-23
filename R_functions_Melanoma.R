@@ -61,7 +61,7 @@ load_melanoma_data <- function(){
     mutate(BRAF = str_replace_all(BRAF, "\\.", "")) %>% 
     mutate(breslow_thickness_mm = parse_number(breslow_thickness_mm))
   
-    # change ID column to uniform capital letters for later filtering
+  # change ID column to uniform capital letters for later filtering
   names(dat_miR) <- c("miRNA", toupper(names(dat_miR)[-1]))
   
   # define IDs to be dropped for further analyses
@@ -70,8 +70,8 @@ load_melanoma_data <- function(){
   
   # wide miR data (78 patients with miRNA data)
   dat_miR_trans <- transpose_dataframe(colnames = c("ID",dat_miR$miRNA), data = dat_miR) %>%
-    filter(!ID %in% controls & !ID %in% duplicates) %>%   #drop duplicate patient data 
-    mutate(ID = parse_number(ID)) #convert ID to numeric
+      filter(!ID %in% controls & !ID %in% duplicates) %>%   #drop duplicate patient data 
+      mutate(ID = parse_number(ID)) #convert ID to numeric
   
   # join both tables
   right_join(dat_miR_trans,dat_meta, by="ID") %>% 
@@ -894,4 +894,46 @@ ls_cvAUC <- function(data){
   
   list(predictions = lapply(rapply(predictions, enquote, how="unlist"), eval),
        labels = lapply(rapply(labels, enquote, how="unlist"), eval))
+}
+
+
+
+
+
+
+## 
+stat_test_BRAF <- function(data, var,  p.adj.anova = "fdr", hccm = TRUE){
+  
+  formula <- as.formula(paste("logexp~",var))
+    
+  # test for significant differences
+  aov_test <-data %>% 
+    group_by(miRNA) %>% 
+    anova_test(formula, white.adjust = hccm) %>% 
+    adjust_pvalue(method = p.adj.anova) %>%
+    filter(p.adj < 0.05)
+  
+  # calculate GH post-hoc test 
+  GH_test <- data %>% 
+    group_by(miRNA) %>% 
+    games_howell_test(formula)%>% 
+    filter(p.adj < 0.05) %>% 
+    filter(miRNA %in% aov_test$miRNA)
+  
+  # calculate maximum value for each miRNA
+  maxexp <- data %>% 
+    filter(miRNA %in% GH_test$miRNA) %>%
+    group_by(miRNA) %>% 
+    summarize(y.position = max(expression)*1.06)
+  
+  # calculate y.positions
+  ypos <- left_join(data.frame(miRNA =GH_test$miRNA),  data.frame(maxexp)) %>%
+    mutate(y.position = ifelse(duplicated(y.position), y.position*1.11, y.position))
+  
+  # 
+  stat_test <- GH_test %>% 
+    add_xy_position(x = var) %>%
+    mutate(y.position = ypos$y.position)
+  
+  return(stat_test)
 }
