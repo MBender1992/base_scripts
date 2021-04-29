@@ -541,3 +541,37 @@ pathway_ctrl_summary <- function(ls,n=n){
        mean_targets = target_genes)
   
 }
+
+
+
+
+
+# calculate ddCT values
+# ID has to be the name of each probe (unique identifyer)
+# variable by which the control is grouped (e.g. time if different controls at different time points)
+get_ddCT <- function(data, ID, group.ctrl, ct.val){
+  
+  dat_HK <- data %>% 
+    group_by(eval(parse(text = ID))) %>%
+    filter(gene_type == "HK") %>%
+    mutate(geomean_HK = geoMean(eval(parse(text = ct.val)), na.rm=T)) %>%
+    distinct(geomean_HK) %>%
+    setNames(c(ID, "geomean_HK"))
+  
+  dat_dCT <- inner_join(data, dat_HK, by = ID) %>%
+    ungroup() %>%
+    filter(gene_type != "HK") %>%
+    select(-gene_type) %>%
+    mutate(dCT = geomean_HK - eval(parse(text = ct.val)))
+  
+  ddCT <- dat_dCT %>% 
+    group_by(eval(parse(text = group.ctrl))) %>%
+    filter(treatment == "ctrl") %>%
+    summarize(ctrl_dCT = mean(dCT, na.rm = T)) %>%
+    setNames(c(group.ctrl, "ctrl_dCT")) %>%
+    inner_join(dat_dCT %>% filter(treatment != "ctrl")) %>%
+    mutate(ddCT = dCT - ctrl_dCT) %>%
+    ungroup()
+  
+  return(ddCT)
+}
