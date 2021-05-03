@@ -9,11 +9,8 @@ document()
 
 setwd("..")
 check("emR")
-install("emR")
 
-library(emR)
-
-
+# install("emR")
 
 
 
