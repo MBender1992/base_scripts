@@ -10,7 +10,10 @@ document()
 setwd("..")
 check("emR")
 
-# install("emR")
+
+install("emR")
+
+
 
 
 
