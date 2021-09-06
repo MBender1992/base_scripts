@@ -14,8 +14,6 @@ check("emR")
 install("emR")
 
 
-
 setwd("C:/MBender/Arbeit/Github/EUMELAREG/EMR_PD1")
-
 
 
