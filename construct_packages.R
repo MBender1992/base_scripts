@@ -23,8 +23,6 @@ install(package)
 
 
 
-# setwd("C:/MBender/Arbeit/Github/EUMELAREG/EMR_PD1")
-
 
 
 
