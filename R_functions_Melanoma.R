@@ -550,7 +550,7 @@ signif_plot_Melanoma <- function(data, x, y, signif=1, method="t.test",p.adj = "
 
 # ......................................................................................................................
 # this function calculates cross validated AUC with 95% confidence intervals for a given caret model object #
-ci.cv.AUC.lasso <- function(data){
+ci.cv.AUC <- function(data){
   
   dat <- filter(data$pred, lambda == data$finalModel$lambdaOpt)
   
@@ -705,7 +705,8 @@ rndr.strat <- function(label, n, ...) {
 
 
 
-calc.model.metrics.2 <- function(x.train, y.train, x.test, y.test, train.method = "glmnet", cv.method = "repeatedcv", number = 10, repeats = 5, metric = "ROC", tuneGrid){
+calc.model.metrics.2 <- function(x.train, y.train, x.test, y.test, train.method = "glmnet", 
+                                 cv.method = "repeatedcv", number = 10, repeats = 5, metric = "ROC", tuneGrid){
   
   # define ctrl function
   cctrl1 <- trainControl(method=cv.method, number=number,repeats = repeats, returnResamp="all",savePredictions = T, 
@@ -774,11 +775,10 @@ model.matrix.subset <- function(model, data){
 }
 
 
-
 # models a function based on a presepcified model and evaluates training and test test using ROC, Sensitivity and Specificity
-lassoEval <- function(model, dat, rep, k, tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01,0.2,by = 0.01))){
+mlEval <- function(modelMatrix, dat, rep, k, train.method = "glmnet", tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01,0.2,by = 0.01))){
   # define model matrix with selected features
-  x <- model.matrix.subset(model, data = dat)
+  x <- modelMatrix
   
   # activate parallel computing
   cl <- makeCluster(detectCores(), type='PSOCK')
@@ -826,7 +826,7 @@ lassoEval <- function(model, dat, rep, k, tuneGrid = expand.grid(alpha = 1, lamb
     # apply model to all folds of that 1 repeat and test against the remaining fold not used for training
     res <- pblapply(c(1:k), function(fold){
       calc.model.metrics.2(x.train = dat[[fold]]$x.train, y.train = dat[[fold]]$y.train, x.test =dat[[fold]]$x.test,
-                           y.test = dat[[fold]]$y.test, train.method = "glmnet",
+                           y.test = dat[[fold]]$y.test, train.method = train.method,
                            tuneGrid = tuneGrid)
     })
   })
