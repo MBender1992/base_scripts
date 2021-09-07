@@ -555,7 +555,7 @@ ci.cv.AUC <- function(data){
   dat <- filter(data$pred, lambda == data$finalModel$lambdaOpt)
   
   obs <-dat$obs
-  pred <- dat$yes # change to no if AUC values are switched
+  pred <- dat$yes 
   
   obs <-split(obs , f = dat$Resample)
   pred <-split(pred , f = dat$Resample)
