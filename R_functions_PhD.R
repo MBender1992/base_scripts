@@ -75,11 +75,11 @@ extract_clusters <- function(data, HeatmapObj, sampleName, sampleClust, geneName
   colClust <- as.data.frame(out) 
   
   # function to extract miRNAs/genes (rows) from the cluster
-  for (i in 1:length(row_order(Ht))){   if (i == 1) {
-    clu <- t(t(rownames(mat[row_order(Ht)[[i]],])))
+  for (i in 1:length(row_order(HeatmapObj))){   if (i == 1) {
+    clu <- t(t(rownames(mat[row_order(HeatmapObj)[[i]],])))
     out <- cbind(clu, paste("cluster", i, sep=""))
     colnames(out) <- c(geneName, geneClust)     } else {
-      clu <- t(t(rownames(mat[row_order(Ht)[[i]],])))
+      clu <- t(t(rownames(mat[row_order(HeatmapObj)[[i]],])))
       clu <- cbind(clu, paste("cluster",i, sep=""))
       out <- rbind(out, clu)    } 
   }
@@ -115,8 +115,8 @@ summary_clusters <- function(ls, miRcluster, samplecluster){
     t_test(log_exp~sampleCluster) %>%
     adjust_pvalue(method = "fdr")
   joined <- left_join(p_val, FC) %>%
-    mutate(FC = 2^logFC) %>%
-    select(c(miRNA,FC, p.adj)) %>%
+    mutate(FC = logFC) %>%
+    select(c(miRNA, FC, p.adj)) %>%
     setNames(c("miRNA", "FC","pvalue"))
   return(joined)
 }
@@ -549,16 +549,20 @@ pathway_ctrl_summary <- function(ls,n=n){
 # calculate ddCT values
 # ID has to be the name of each probe (unique identifyer)
 # variable by which the control is grouped (e.g. time if different controls at different time points)
-get_ddCT <- function(data, ID, group.ctrl, ct.val){
+get_ddCT <- function(data, ID, group.ctrl, ct.val, Messung = NULL){
+  
+  if(is.null(Messung)){
+    warning("Only data from 1 measurement used for analysis.")
+  }
   
   dat_HK <- data %>% 
-    group_by(eval(parse(text = ID))) %>%
+    group_by(Messung, eval(parse(text = ID))) %>%
     filter(gene_type == "HK") %>%
     mutate(geomean_HK = geoMean(eval(parse(text = ct.val)), na.rm=T)) %>%
     distinct(geomean_HK) %>%
-    setNames(c(ID, "geomean_HK"))
+    setNames(c("Messung", ID, "geomean_HK"))
   
-  dat_dCT <- inner_join(data, dat_HK, by = ID) %>%
+  dat_dCT <- inner_join(data, dat_HK, by = c("Messung", ID)) %>%
     ungroup() %>%
     filter(gene_type != "HK") %>%
     select(-gene_type) %>%
@@ -574,4 +578,32 @@ get_ddCT <- function(data, ID, group.ctrl, ct.val){
     ungroup()
   
   return(ddCT)
+}
+
+
+
+
+
+# save volcano plot
+save_volcano_plot <- function(data,...){
+  png(paste("Results/",deparse(substitute(data)),"_volcano.png", sep = ""), units="in", width=5, height=4, res=600)
+  p <- rbiomirgs_volcano(gsadfm = data,topgsLabel = TRUE, xLabel = "model coefficient",...)
+  print(p)
+  dev.off() 
+}
+
+# save bar plot within volcano plot
+save_volcano_bar_plot <- function(data,print.all = TRUE,...){
+  if (print.all == TRUE){
+    png(paste("Results/",deparse(substitute(data)),"_volcano_bar.png", sep = ""), units="in", width=5, height=4, res=600)
+    p <- rbiomirgs_bar(gsadfm = data,signif_only = FALSE,gs.name = FALSE,
+                       n = "all",xLabel = "gene set", yLabel = "model coefficient",...)
+    print(p)
+  } else {
+    png(paste("Results/",deparse(substitute(data)),"_bar.png", sep = ""), units="in", width=5, height=4, res=600)
+    p <- rbiomirgs_bar(gsadfm = data,signif_only = TRUE,gs.name = TRUE,xLabel = "model coefficient",
+                       yTxtSize = 7, n = 15,...)
+    print(p)
+  }
+  dev.off()
 }
