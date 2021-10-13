@@ -1,4 +1,4 @@
-#<<<<<<<<<<<HEAD 
+#<<<<<<<<<<<HEAD
 
 ##################################################
 # This script contains several useful functions  #
@@ -25,9 +25,9 @@
 transpose_dataframe <-  function(colnames, data){
   names <- c(colnames)
   dat_wide <- data[,-1] %>%
-    t %>% 
+    t %>%
     as_tibble(rownames = NA) %>%
-    rownames_to_column %>% 
+    rownames_to_column %>%
     setNames(names)
   return(dat_wide)
 }
@@ -49,35 +49,35 @@ transpose_dataframe <-  function(colnames, data){
 
 load_melanoma_data <- function(){
   library(readxl)
-  
+
   # load csv files
   dat_miR   <- read_csv("Data/miRNA_Expression_Fireplex_Melanoma_Study.csv")
   dat_meta  <- read_xlsx("Data/Metadata_Melanoma_Study.xlsx") %>%
     select(-c(therapy_start, Abnahmedatum)) %>%
-    mutate(TRIM_PDL1_Expression = str_replace_all(TRIM_PDL1_Expression,"\\++","+")) %>% 
+    mutate(TRIM_PDL1_Expression = str_replace_all(TRIM_PDL1_Expression,"\\++","+")) %>%
     mutate(TRIM_PDL1_Expression = ifelse(TRIM_PDL1_Expression == "o", NA,TRIM_PDL1_Expression)) %>%
     mutate(Stadium = toupper(Stadium)) %>%
     mutate(Stadium = str_extract(Stadium, "^[IV]{1,3}")) %>%
-    mutate(BRAF = str_replace_all(BRAF, "\\.", "")) %>% 
+    mutate(BRAF = str_replace_all(BRAF, "\\.", "")) %>%
     mutate(breslow_thickness_mm = parse_number(breslow_thickness_mm))
-  
+
   # change ID column to uniform capital letters for later filtering
   names(dat_miR) <- c("miRNA", toupper(names(dat_miR)[-1]))
-  
+
   # define IDs to be dropped for further analyses
   controls <- c("K104_1", "K104_2", "K104_3A", "K104_3B")
   duplicates <- c("22B","38B","39B","47B")
-  
+
   # wide miR data (78 patients with miRNA data)
   dat_miR_trans <- transpose_dataframe(colnames = c("ID",dat_miR$miRNA), data = dat_miR) %>%
-      filter(!ID %in% controls & !ID %in% duplicates) %>%   #drop duplicate patient data 
+      filter(!ID %in% controls & !ID %in% duplicates) %>%   #drop duplicate patient data
       mutate(ID = parse_number(ID)) #convert ID to numeric
-  
+
   # join both tables
-  right_join(dat_miR_trans,dat_meta, by="ID") %>% 
+  right_join(dat_miR_trans,dat_meta, by="ID") %>%
     filter(!ID %in% c(1,2)) %>% # no data available for patient 1 and 2 but still part of the source table
     mutate(miRExpAssess = ifelse(is.na(rowSums(.[,which(str_detect(names(.),"mir"))])), 0,1))  %>%# if no miRNA expression has been measure fill in 0
-    arrange(ID) %>% 
+    arrange(ID) %>%
     mutate(Responder = factor(Responder, levels = c("nein", "ja"), labels = c("no", "yes"))) %>%
     mutate(prior_BRAF_therapy = ifelse(str_detect(Vorbehandlung,"Mek|Dabra|Tafinlar|Tefinlar|MEK|BRAF|Vemu|[zZ]ellboraf"), 1, 0)) %>%
     select(-Vorbehandlung)
@@ -94,52 +94,52 @@ load_melanoma_data <- function(){
 # ....................................................................................................................
 # this function loads the data for overlap wang to be directly used in a heatmap
 
-# Arguments                                                                             
+# Arguments
 
 dat_heatmap_wang <- function(add.data = NULL, join.by = "ID"){
   # change working directory
   setwd("Z:/Aktuell/Eigene Dateien/Eigene Dateien_Marc/R/Projekte/Doktorarbeiten_Melanom_Liquid_Biopsies/Daten")
-  
+
   # load miRNA data
-  dat_melanoma <- load_melanoma_data(characterAsFactor = FALSE) %>% 
+  dat_melanoma <- load_melanoma_data(characterAsFactor = FALSE) %>%
     select(-c(adjuvant_IFN, befallen_Organe))
   # load overlap data
   overlap_wang <- read_csv("overlap_our_panel_Wang.csv")
-  
+
   #tidy data
-  dat_tidy <- dat_melanoma %>% 
+  dat_tidy <- dat_melanoma %>%
     gather(
-      miRNA, 
+      miRNA,
       expression,
       -c(ID, Hirnmetastase, BRAF, Stadium,
          Group, Baseline,Responder, age, sex,
          CRP, LDH, S100, Eosinophile,TRIM_PDL1_Expression)
-    ) %>% 
+    ) %>%
     mutate(Stadium = ifelse(Stadium == "IV", "IV", "<IV"),
            log_exp = log2(expression),
            BRAF = factor(BRAF, levels = c("wt", "mu", "nras")))
-  
+
   # define index with miRNAs in overlap
   index_wang <- overlap_wang  %>% .$miRNA %>%
     str_replace_all(" ", "")
-  
+
   # extract overlap data
   if(!is.null(add.data)){
-  dat_wang <- dat_tidy %>% 
+  dat_wang <- dat_tidy %>%
     filter(miRNA %in% index_wang) %>%
     inner_join(add.data, by = join.by)
-  } else { 
-    dat_wang <- dat_tidy %>% 
+  } else {
+    dat_wang <- dat_tidy %>%
       filter(miRNA %in% index_wang)
     }
-  
+
   #  prepare data for Heatmap
-  dat_Heatmap <- dat_wang %>% 
+  dat_Heatmap <- dat_wang %>%
     select(-expression) %>%
-    spread(miRNA, log_exp) %>% 
+    spread(miRNA, log_exp) %>%
     data.frame() %>%
-    column_to_rownames("ID") 
-  
+    column_to_rownames("ID")
+
   return(dat_Heatmap)
 }
 #.............................................................................................................
@@ -169,10 +169,10 @@ dat_heatmap_wang <- function(add.data = NULL, join.by = "ID"){
 patient_table <- function(data, var){
   nas <- table(is.na(data[,var]))
   dat <- table(data[,var])
-  new_dat <- data.frame(var = c(dat[1:length(dat)],ifelse(length(nas)==2, nas[2],0))) 
+  new_dat <- data.frame(var = c(dat[1:length(dat)],ifelse(length(nas)==2, nas[2],0)))
   rownames(new_dat) <- c(names(dat[1:length(dat)]), "NA")
   new_dat <- new_dat %>% rownames_to_column()
-  dat_percent <- new_dat %>% mutate(percent = round(var/sum(var)*100,1)) 
+  dat_percent <- new_dat %>% mutate(percent = round(var/sum(var)*100,1))
   colnames(dat_percent) <- c(var, "n", "percent")
   return(dat_percent)
 }
@@ -238,9 +238,9 @@ theme_Melanoma <- function(axis.text.size=10, Legend = TRUE,...){
           panel.grid.minor=element_blank(),
           strip.text.x = element_text(face = "bold", size = axis.text.size+1),
           strip.background=element_blank(),
-          panel.spacing = unit(1, "lines"), ...) 
-  
-  
+          panel.spacing = unit(1, "lines"), ...)
+
+
   if(Legend == TRUE) {
     theme_custom + theme(legend.key.size = unit(1,"line"))
   } else {
@@ -259,11 +259,11 @@ theme_Melanoma <- function(axis.text.size=10, Legend = TRUE,...){
 # these functions are used to ensure a uniform color palette in each plot #
 
 scale_fill_Melanoma <- function(...){
-  scale_fill_manual(values = c("darkgrey", "cornflowerblue","forestgreen","#d73027","purple", ...)) 
+  scale_fill_manual(values = c("darkgrey", "cornflowerblue","forestgreen","#d73027","purple", ...))
 }
 
 scale_color_Melanoma <- function(...){
-  scale_color_manual(values = c("darkgrey", "cornflowerblue","forestgreen","#d73027","purple",...)) 
+  scale_color_manual(values = c("darkgrey", "cornflowerblue","forestgreen","#d73027","purple",...))
 }
 # ..................................................................................................................
 
@@ -281,25 +281,25 @@ scale_color_Melanoma <- function(...){
 #  - x: independent variable
 #  - y: dependent variable
 #  - group.var: grouping variable if applicable
-#  - p.adj: p adjustment method 
+#  - p.adj: p adjustment method
 #  - signif: significance level (other results are filtered)
-#  - method: can either be "t.test" or "wilcoxon"  
+#  - method: can either be "t.test" or "wilcoxon"
 
 
 signif_Melanoma <- function(data,x,y, group.var=NULL, p.adj = "fdr",var.equal = FALSE, filter.p.adj= FALSE,
                             signif= 1, method="t.test"){
-  
+
   if(filter.p.adj == FALSE){
     warning("Results filtered by raw p-values")
   }
-  
+
   formula <- paste(
     y,"~",
     x, sep=" "
   )
-  
+
   data <- data %>% filter(!is.na(get(x)) & !is.na(get(y)))
-  
+
   pvals <- compare_means(
     as.formula(formula),
     data=data,
@@ -307,16 +307,16 @@ signif_Melanoma <- function(data,x,y, group.var=NULL, p.adj = "fdr",var.equal = 
     var.equal = var.equal,
     method=method,
     p.adjust.method = p.adj
-  ) 
-  
-  dat.signif <- pvals %>% 
+  )
+
+  dat.signif <- pvals %>%
     add_significance("p.adj") %>%
-    
+
     {
       if (filter.p.adj == TRUE) filter(.,p.adj < signif)
       else filter(.,p < signif)
     }
-  
+
   return(dat.signif)
 }
 # ..................................................................................................................
@@ -334,7 +334,7 @@ signif_Melanoma <- function(data,x,y, group.var=NULL, p.adj = "fdr",var.equal = 
 #  - x: independent variable
 #  - y: dependent variable
 #  - facet: grouping variable if applicable, used for facetting
-#  - p.label: specifies how the p-value is displayed, can be manually changed to p.adj, p.format, etc. 
+#  - p.label: specifies how the p-value is displayed, can be manually changed to p.adj, p.format, etc.
 #             mathematic operations like "round" are also possible within brackets
 #  - add: specifies additional geometrics
 #  - scale: specify if all plots shall have the same scale or if scales are free
@@ -400,7 +400,7 @@ boxplot_Melanoma <- function(data,
     theme_Melanoma(axis.text.size = axis.text.size,Legend =Legend) +
     scale_color_Melanoma() +
     scale_fill_Melanoma()
-  
+
   p.facet + if(significance.new == TRUE){stat_pvalue_manual(diff.expr , label = p.label,
                                                             tip.length = tip.length,size=p.size,
                                                             y.position = max(data[,y])*1.05)}
@@ -493,12 +493,12 @@ dotplot_Melanoma <- function(data,
 #  - facet: grouping variable if applicable, used for facetting
 #  - signif: significance level (other results are filtered)
 #  - method: method accepted by compare_means
-#  - p.label: specifies how the p-value is displayed, can be manually changed to p.adj, p.format, etc. 
+#  - p.label: specifies how the p-value is displayed, can be manually changed to p.adj, p.format, etc.
 #             mathematic operations like "round" are also possible within brackets
 #  - plot.type: specifies desired plot type. can be chosen between "dotplot" and "boxplot"
 #  - data: data
 #  - group.var: grouping variable if applicable
-#  - p.adj: p adjustment method 
+#  - p.adj: p adjustment method
 #  - signif: significance level (other results are filtered)
 
 
@@ -550,20 +550,20 @@ signif_plot_Melanoma <- function(data, x, y, signif=1, method="t.test",p.adj = "
 
 # ......................................................................................................................
 # this function calculates cross validated AUC with 95% confidence intervals for a given caret model object #
-ci.cv.AUC <- function(data){
-  
-  dat <- filter(data$pred, lambda == data$finalModel$lambdaOpt)
-  
-  obs <-dat$obs
-  pred <- dat$yes 
-  
-  obs <-split(obs , f = dat$Resample)
-  pred <-split(pred , f = dat$Resample)
-  
-  cvAUC::ci.cvAUC(pred,obs)
-}
-# ......................................................................................................................
 
+# ......................................................................................................................
+# ci_cv_AUC <- function(model){
+#   dat <- filter(model$pred, lambda == model$finalModel$lambdaOpt)
+#
+#   obs <- dat$obs
+#   event_name <- levels(obs)[2]
+#   pred <- dat[[event_name]]
+#
+#   obs <- split(obs, f = dat$Resample)
+#   pred <- splot(pred, f = dat$Resample)
+#
+#   ci.cvAUC(pred, obs)
+# }
 
 
 
@@ -572,46 +572,46 @@ ci.cv.AUC <- function(data){
 #....................................................................................................................
 # this function calculates the weighted importance of a model ensemble              #
 # it calculates importance for single features in each model and then combines the  #
-# results in a weighted approach by model importance in the stacked model           # 
+# results in a weighted approach by model importance in the stacked model           #
 
 # Arguments:
 #  - models: vector with model names
 #  - dat: data
 weightedImp <- function(models, dat){
-  
+
   #calculate importance
   imp <- sapply(models,data=dat, function(names,data){
     varImp(data$models[[names]])$importance
-  }) %>% 
+  }) %>%
     #transform to data frame
-    as.data.frame() %>% 
+    as.data.frame() %>%
     # remove duplicate entries
     select(-contains("neg")) %>%
     setNames(models)
-  
-  
+
+
   #calculate weights based on the model importance of the individual models within the ensemble
   weights <- varImp(ensemble_3$ens_model)$importance %>%
-    select(neg) %>% 
+    select(neg) %>%
     mutate(neg = neg/100) %>%
     unlist() %>%
     setNames(models)
-  
+
   #combine weights with the separate model importances
-  weighted_imp <- t(t(imp)*weights) %>% 
+  weighted_imp <- t(t(imp)*weights) %>%
     data.frame()%>%
     rownames_to_column("Feature") %>%
-    mutate(overall = rowSums(.[,-1])) %>% 
+    mutate(overall = rowSums(.[,-1])) %>%
     mutate(percent = overall/sum(overall)*100) %>%
     mutate(scaled = percent/max(percent)*100) %>%
     select(c(Feature, scaled)) %>%
-    arrange((scaled)) %>% 
-    mutate(Feature = str_replace_all(.$Feature,"X","")) %>% 
-    mutate(Feature = str_replace_all(.$Feature,"hsa","")) %>% 
+    arrange((scaled)) %>%
+    mutate(Feature = str_replace_all(.$Feature,"X","")) %>%
+    mutate(Feature = str_replace_all(.$Feature,"hsa","")) %>%
     mutate(Feature = str_replace_all(.$Feature,"\\.\\.","")) %>%
     mutate(Feature = str_replace_all(.$Feature,"\\.$","")) %>%
-    mutate(Feature = str_replace_all(.$Feature,"\\.","-")) 
-  
+    mutate(Feature = str_replace_all(.$Feature,"\\.","-"))
+
   return(weighted_imp)
 }
 
@@ -641,18 +641,18 @@ ggexosome <- function(data,
     theme(legend.key.size = unit(3,"line"),
           legend.title = element_blank())+
     scale_color_Melanoma()
-    
+
 }
 
 
-### 
+###
 ggexosome2 <- function(data,x,y,facet.by=NULL,col,  method = "t.test"){
   data %>%  filter(!is.na(!!sym(x))) %>%
-    ggboxplot(x,y, facet.by = facet.by, 
-              ylab = y, 
+    ggboxplot(x,y, facet.by = facet.by,
+              ylab = y,
               add = "jitter",
               add.params = list(color = col),
-              outlier.shape = NA, 
+              outlier.shape = NA,
               ) +
     stat_compare_means(method = method) +
     ylim(min(data[y])/1.1, max(data[y])*1.1)
@@ -671,7 +671,7 @@ exo_arrange <- function(data,x,y,facet.by,col="black", ylab){
 # function to display p-values in table1
 rndr <- function(x, name, ...) {
   if (length(x) == 0) {
-    y <- dat_table1[[name]] 
+    y <- dat_table1[[name]]
     ind <- !is.na(y)
     y <- y[ind]
     s <- rep("", length(render.default(x=y, name=name, ...)))
@@ -705,44 +705,44 @@ rndr.strat <- function(label, n, ...) {
 
 
 
-calc.model.metrics.2 <- function(x.train, y.train, x.test, y.test, train.method = "glmnet", 
-                                 cv.method = "repeatedcv", number = 10, repeats = 5, metric = "ROC", tuneGrid){
-  
-  # define ctrl function
-  cctrl1 <- trainControl(method=cv.method, number=number,repeats = repeats, returnResamp="all",savePredictions = T, 
-                         classProbs=TRUE, summaryFunction=twoClassSummary)
-  
-  # run glmnet model
-  md <- train(x.train, y.train, method = train.method,preProcess = c("center","scale"), 
-              trControl = cctrl1,metric = metric,tuneGrid = tuneGrid)
-  
-  # obtain cv AUC of training folds
-  ci_cv <- ci.cv.AUC.lasso(md)
-  
-  # train coefs
-  feat <- coef(md$finalModel, md$finalModel$lambdaOpt)
-  
-  # obtain index from max metric
-  opt <- md$results[which(md$results$lambda == md$finalModel$lambdaOpt),]
-  
-  # predict
-  pred <- predict(md, x.test, type="prob")
-  
-  # object to return
-  res <- list(
-    predictions = data.frame(pred.ja = pred$yes, obs = y.test),
-    coefficients = rownames_to_column(data.frame(vals = feat[feat[,1] != 0, 1][-1]),"coefs"),
-    train.metrics = opt[which(opt$ROC == max(opt$ROC)),],
-    train.cv = data.frame(cvAUC = ci_cv$cvAUC,
-                          se = ci_cv$se,
-                          lower = ci_cv$ci[1],
-                          upper = ci_cv$ci[2]),
-    test.metrics = data.frame(AUC = auc(roc(y.test, pred[,1], direction = ">", levels = c("no", "yes"))),
-                              Sens = sensitivity(y.test, predict(md, x.test, type="raw"))  ,
-                              Spec = specificity(y.test, predict(md, x.test, type="raw")))
-  )
-  return(res)
-}
+# calc.model.metrics.2 <- function(x.train, y.train, x.test, y.test, train.method = "glmnet",
+#                                  cv.method = "repeatedcv", number = 10, repeats = 5, metric = "ROC", tuneGrid){
+#
+#   # define ctrl function
+#   cctrl1 <- trainControl(method=cv.method, number=number,repeats = repeats, returnResamp="all",savePredictions = T,
+#                          classProbs=TRUE, summaryFunction=twoClassSummary)
+#
+#   # run glmnet model
+#   md <- train(x.train, y.train, method = train.method,preProcess = c("center","scale"),
+#               trControl = cctrl1,metric = metric,tuneGrid = tuneGrid)
+#
+#   # obtain cv AUC of training folds
+#   ci_cv <- ci.cv.AUC(md)
+#
+#   # train coefs
+#   feat <- coef(md$finalModel, md$finalModel$lambdaOpt)
+#
+#   # obtain index from max metric
+#   opt <- md$results[which(md$results$lambda == md$finalModel$lambdaOpt),]
+#
+#   # predict
+#   pred <- predict(md, x.test, type="prob")
+#
+#   # object to return
+#   res <- list(
+#     predictions = data.frame(pred.ja = pred$yes, obs = y.test),
+#     coefficients = rownames_to_column(data.frame(vals = feat[feat[,1] != 0, 1][-1]),"coefs"),
+#     train.metrics = opt[which(opt$ROC == max(opt$ROC)),],
+#     train.cv = data.frame(cvAUC = ci_cv$cvAUC,
+#                           se = ci_cv$se,
+#                           lower = ci_cv$ci[1],
+#                           upper = ci_cv$ci[2]),
+#     test.metrics = data.frame(AUC = auc(roc(y.test, pred[,1], direction = ">", levels = c("no", "yes"))),
+#                               Sens = sensitivity(y.test, predict(md, x.test, type="raw"))  ,
+#                               Spec = specificity(y.test, predict(md, x.test, type="raw")))
+#   )
+#   return(res)
+# }
 
 
 
@@ -763,9 +763,9 @@ model.matrix.subset <- function(model, data){
   } else if(model == "relaxedLassomiRNA"){
     mm <- model.matrix(Responder~., data = select(data, c(feat.relaxed.miRNA$coef,Responder)))[,-1]
   } else {
-    stop("Please specify 1 of the following 4 options: 
+    stop("Please specify 1 of the following 4 options:
     1. 'baseline' for a base model using conventional serum markers (LDH, CRP, S100, Eosinophile)
-    2. 'miRNA' for a model using only miRNAs (reduced by lasso to informative features) 
+    2. 'miRNA' for a model using only miRNAs (reduced by lasso to informative features)
     3. 'signif' for a model with significantly different features between responders and non-responders
     4. 'complete' for a model with all predictors (reduced by lasso)
     5. 'relaxedLasso' for a model with the best predictors selected by the 'complete' model (afterwards reduced again with LASSO)
@@ -776,164 +776,164 @@ model.matrix.subset <- function(model, data){
 
 
 # models a function based on a presepcified model and evaluates training and test test using ROC, Sensitivity and Specificity
-mlEval <- function(modelMatrix, dat, rep, k, train.method = "glmnet", tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01,0.2,by = 0.01))){
-  # define model matrix with selected features
-  x <- modelMatrix
-  
-  # activate parallel computing
-  cl <- makeCluster(detectCores(), type='PSOCK')
-  registerDoParallel(cl)
-  
-  # generate 10 folds for outer loop
-  
-  set.seed(12)
-  fold.train <- createMultiFolds(y, k = k, times = rep) # ensure that at least 10 samples are in each fold
-  
-  # split data based on these folds (Fold1 means that Fold1 is used for testing)
-  train.test.folds <- lapply(c(1:rep), function(split){
-    
-    # select only folds containing the specified repeat in each iteration
-    if(split == 10){
-      ind <- names(fold.train) %>% str_detect("Rep10")
-      dat <- fold.train[ind]  
-    } else {
-      ind <- names(fold.train) %>% str_detect(paste("Rep0",split, sep =""))
-      dat <- fold.train[ind]
-    }
-    
-    # split data into training and test set with each fold being the test set once
-    res <- lapply(c(1:k), function(fold){
-      list(x.test = x[-dat[[fold]],], 
-           x.train = x[dat[[fold]],],
-           y.test = y[-dat[[fold]]],
-           y.train = y[dat[[fold]]] 
-      )
-    })
-    return(res)
-  })
-  
-  # define name of the list elements
-  reps <- paste0("Rep", 1:rep)
-  folds <- paste0("Fold", 1:k)
-  train.test.folds <- setNames(lapply(train.test.folds, setNames, folds), reps)
-  
-  set.seed(849)
-  lapply(c(1:rep), function(split){
-    # select Data from 1 repeat
-    dat <- train.test.folds[[paste("Rep",split, sep ="")]]
-    # print message to follow progress
-    message(paste("Starting calculation of Rep", split,"... of", rep))
-    # apply model to all folds of that 1 repeat and test against the remaining fold not used for training
-    res <- pblapply(c(1:k), function(fold){
-      calc.model.metrics.2(x.train = dat[[fold]]$x.train, y.train = dat[[fold]]$y.train, x.test =dat[[fold]]$x.test,
-                           y.test = dat[[fold]]$y.test, train.method = train.method,
-                           tuneGrid = tuneGrid)
-    })
-  })
-  stopCluster(cl)
-}
+# mlEval <- function(modelMatrix, dat, rep, k, train.method = "glmnet", tuneGrid = expand.grid(alpha = 1, lambda = seq(0.01,0.2,by = 0.01))){
+#   # define model matrix with selected features
+#   x <- modelMatrix
+#
+#   # activate parallel computing
+#   cl <- makeCluster(detectCores(), type='PSOCK')
+#   registerDoParallel(cl)
+#
+#   # generate 10 folds for outer loop
+#
+#   set.seed(12)
+#   fold.train <- createMultiFolds(y, k = k, times = rep) # ensure that at least 10 samples are in each fold
+#
+#   # split data based on these folds (Fold1 means that Fold1 is used for testing)
+#   train.test.folds <- lapply(c(1:rep), function(split){
+#
+#     # select only folds containing the specified repeat in each iteration
+#     if(split == 10){
+#       ind <- names(fold.train) %>% str_detect("Rep10")
+#       dat <- fold.train[ind]
+#     } else {
+#       ind <- names(fold.train) %>% str_detect(paste("Rep0",split, sep =""))
+#       dat <- fold.train[ind]
+#     }
+#
+#     # split data into training and test set with each fold being the test set once
+#     res <- lapply(c(1:k), function(fold){
+#       list(x.test = x[-dat[[fold]],],
+#            x.train = x[dat[[fold]],],
+#            y.test = y[-dat[[fold]]],
+#            y.train = y[dat[[fold]]]
+#       )
+#     })
+#     return(res)
+#   })
+#
+#   # define name of the list elements
+#   reps <- paste0("Rep", 1:rep)
+#   folds <- paste0("Fold", 1:k)
+#   train.test.folds <- setNames(lapply(train.test.folds, setNames, folds), reps)
+#
+#   set.seed(849)
+#   lapply(c(1:rep), function(split){
+#     # select Data from 1 repeat
+#     dat <- train.test.folds[[paste("Rep",split, sep ="")]]
+#     # print message to follow progress
+#     message(paste("Starting calculation of Rep", split,"... of", rep))
+#     # apply model to all folds of that 1 repeat and test against the remaining fold not used for training
+#     res <- pblapply(c(1:k), function(fold){
+#       calc.model.metrics.2(x.train = dat[[fold]]$x.train, y.train = dat[[fold]]$y.train, x.test =dat[[fold]]$x.test,
+#                            y.test = dat[[fold]]$y.test, train.method = train.method,
+#                            tuneGrid = tuneGrid)
+#     })
+#   })
+#   stopCluster(cl)
+# }
 
 
 
 # convert metrics from training data list to dataframe
-unlist.model <- function(dat,metric, element){
-  ls <- lapply(1:rep, function(split){
-    do.call(rbind.data.frame, sapply(dat[[split]], '[', element)) 
-  }) 
-  unlist(sapply(ls, "[", metric))
-}
+# unlist_model <- function(dat,metric, element){
+#   ls <- lapply(1:rep, function(split){
+#     do.call(rbind.data.frame, sapply(dat[[split]], '[', element))
+#   })
+#   unlist(sapply(ls, "[", metric))
+# }
 
 
-# extract coefficients from model list 
-extractCoefs <- function(data){
-  lapply(1:10, function(x){
-    tmp <- sapply(sapply(data[[x]], '[', 'coefficients'), '[', 'coefs') %>% unlist()
-    data.frame(coef = tmp) 
-  })
-}
+# extract coefficients from model list
+# extract_coefs <- function(data){
+#   lapply(1:10, function(x){
+#     tmp <- sapply(sapply(data[[x]], '[', 'coefficients'), '[', 'coefs') %>% unlist()
+#     data.frame(coef = tmp)
+#   })
+# }
 
 
 
 
-# 
-rbind.model.ci <- function(model){
-  
-  ls <- ls_cvAUC(model)
-  out <- cvAUC(ls$predictions, ls$labels)
-  res <-  ci.cvAUC(ls$predictions, ls$labels)
-  
-  rbind(cv.AUC.inner = data.frame(cvAUC = mean(unlist.model(model, "cvAUC", "train.cv")),
-                                 lower = mean(unlist.model(model, "lower", "train.cv")),
-                                 upper = mean(unlist.model(model, "upper", "train.cv"))),
-        cv.AUC.outer = data.frame(cvAUC = res$cvAUC,
-                                lower = min(res$ci),
-                                upper = max(res$ci)
-                                )
-  )
-}
+#
+# rbind_model_ci <- function(model){
+#
+#   ls <- ls_cvAUC(model)
+#   out <- cvAUC(ls$predictions, ls$labels)
+#   res <-  ci.cvAUC(ls$predictions, ls$labels)
+#
+#   rbind(cv.AUC.inner = data.frame(cvAUC = mean(unlist_model(model, "cvAUC", "train.cv")),
+#                                  lower = mean(unlist_model(model, "lower", "train.cv")),
+#                                  upper = mean(unlist_model(model, "upper", "train.cv"))),
+#         cv.AUC.outer = data.frame(cvAUC = res$cvAUC,
+#                                 lower = min(res$ci),
+#                                 upper = max(res$ci)
+#                                 )
+#   )
+# }
 
 
 
 
 ## function to split data in a way that the function cvAUC can use it for calculation of ROC, se and confidence intervals
-ls_cvAUC <- function(data){
-  predictions <- lapply(1:10, function(d){
-    tmp <- sapply(data[[d]], "[", "predictions")
-    lapply(1:10, function(x){
-      1-tmp[[x]]$pred.ja
-    })
-  })
-  
-  
-  labels <- lapply(1:10, function(d){
-    labs <- sapply(data[[d]], "[", "predictions")
-    lapply(1:10, function(x){
-      labs[[x]]$obs
-    })
-  }) 
-  
-  list(predictions = lapply(rapply(predictions, enquote, how="unlist"), eval),
-       labels = lapply(rapply(labels, enquote, how="unlist"), eval))
-}
+# ls_cvAUC <- function(data){
+#   predictions <- lapply(1:10, function(d){
+#     tmp <- sapply(data[[d]], "[", "predictions")
+#     lapply(1:10, function(x){
+#       1-tmp[[x]]$pred.ja
+#     })
+#   })
+#
+#
+#   labels <- lapply(1:10, function(d){
+#     labs <- sapply(data[[d]], "[", "predictions")
+#     lapply(1:10, function(x){
+#       labs[[x]]$obs
+#     })
+#   })
+#
+#   list(predictions = lapply(rapply(predictions, enquote, how="unlist"), eval),
+#        labels = lapply(rapply(labels, enquote, how="unlist"), eval))
+# }
 
 
 
 
 
 
-## 
+##
 stat_test_BRAF <- function(data, var,  p.adj.anova = "fdr", hccm = TRUE){
-  
+
   formula <- as.formula(paste("logexp~",var))
-    
+
   # test for significant differences
-  aov_test <-data %>% 
-    group_by(miRNA) %>% 
-    anova_test(formula, white.adjust = hccm) %>% 
+  aov_test <-data %>%
+    group_by(miRNA) %>%
+    anova_test(formula, white.adjust = hccm) %>%
     adjust_pvalue(method = p.adj.anova) %>%
     filter(p.adj < 0.05)
-  
-  # calculate GH post-hoc test 
-  GH_test <- data %>% 
-    group_by(miRNA) %>% 
-    games_howell_test(formula)%>% 
-    filter(p.adj < 0.05) %>% 
+
+  # calculate GH post-hoc test
+  GH_test <- data %>%
+    group_by(miRNA) %>%
+    games_howell_test(formula)%>%
+    filter(p.adj < 0.05) %>%
     filter(miRNA %in% aov_test$miRNA)
-  
+
   # calculate maximum value for each miRNA
-  maxexp <- data %>% 
+  maxexp <- data %>%
     filter(miRNA %in% GH_test$miRNA) %>%
-    group_by(miRNA) %>% 
+    group_by(miRNA) %>%
     summarize(y.position = max(expression)*1.06)
-  
+
   # calculate y.positions
   ypos <- left_join(data.frame(miRNA =GH_test$miRNA),  data.frame(maxexp)) %>%
     mutate(y.position = ifelse(duplicated(y.position), y.position*1.11, y.position))
-  
-  # 
-  stat_test <- GH_test %>% 
+
+  #
+  stat_test <- GH_test %>%
     add_xy_position(x = var) %>%
     mutate(y.position = ypos$y.position)
-  
+
   return(stat_test)
 }
