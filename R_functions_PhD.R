@@ -142,10 +142,10 @@ drop_attr <- function(x) {
 # Arguments                                                     #
 #  - axis.text.size: Size of the axes                           #
 #  - Legend: logical indicating if legend should be printed     #
-theme_PhD <- function(axis.text.size=10, Legend = TRUE,...){
+theme_PhD <- function(axis.text.size=12, Legend = TRUE,...){
   
   theme_custom <- theme_pubr()+
-    theme(axis.title.x=element_blank(),
+    theme(axis.title.x=element_text(face = "bold", size = axis.text.size+1),
           axis.text.x = element_text(face = "bold", size=axis.text.size),
           axis.text.y = element_text(face = "bold", size=axis.text.size),
           axis.title.y = element_text(face = "bold", size = axis.text.size+1),
